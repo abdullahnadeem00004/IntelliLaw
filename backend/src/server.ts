@@ -13,6 +13,7 @@ import billingRoutes from './routes/billing.js';
 import expenseRoutes from './routes/expenses.js';
 import documentRoutes from './routes/documents.js';
 import hearingRoutes from './routes/hearings.js';
+import dashboardRoutes from './routes/dashboard.js';
 import setupGoogleOAuth from './config/oauth.js';
 
 dotenv.config();
@@ -56,6 +57,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/hearings', hearingRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

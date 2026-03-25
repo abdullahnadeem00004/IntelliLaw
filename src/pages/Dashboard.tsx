@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/FirebaseProvider';
 import { Hearing, UserRole } from '../types';
 import { 
@@ -38,6 +39,7 @@ const revenueData = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { user, userProfile } = useAuth();
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +49,98 @@ export default function Dashboard() {
   const [clientsCount, setClientsCount] = useState(0);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [upcomingHearings, setUpcomingHearings] = useState<Hearing[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [myTasks, setMyTasks] = useState<any[]>([]);
+  const [myCases, setMyCases] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+
+  // Fetch dashboard statistics
+  const fetchDashboardStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/dashboard/stats', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setActiveCasesCount(data.activeCases || 0);
+        setUpcomingHearingsCount(data.upcomingHearings || 0);
+        setClientsCount(data.totalClients || 0);
+        setPendingTasksCount(data.pendingTasks || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
+  };
+
+  // Fetch upcoming hearings
+  const fetchUpcomingHearings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/dashboard/upcoming-hearings?limit=5', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUpcomingHearings(data);
+      }
+    } catch (error) {
+      console.error('Error fetching upcoming hearings:', error);
+    }
+  };
+
+  // Fetch recent activities
+  const fetchRecentActivities = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/dashboard/recent-activities?limit=10', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setActivities(data);
+      }
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+    }
+  };
+
+  // Fetch my tasks
+  const fetchMyTasks = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/dashboard/my-tasks?limit=5', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMyTasks(data);
+      }
+    } catch (error) {
+      console.error('Error fetching my tasks:', error);
+    }
+  };
+
+  // Fetch my cases
+  const fetchMyCases = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/dashboard/my-cases?limit=5', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMyCases(data);
+      }
+    } catch (error) {
+      console.error('Error fetching my cases:', error);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -54,14 +148,24 @@ export default function Dashboard() {
       return;
     }
 
-    // TODO: Implement dashboard data fetching from API
-    // Dashboard data will be fetched when backend services are ready
-    setActiveCasesCount(0);
-    setUpcomingHearingsCount(0);
-    setClientsCount(0);
-    setPendingTasksCount(0);
-    setUpcomingHearings([]);
-    setLoading(false);
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchDashboardStats(),
+          fetchUpcomingHearings(),
+          fetchRecentActivities(),
+          fetchMyTasks(),
+          fetchMyCases(),
+        ]);
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
   }, [user]);
 
   if (loading) {
@@ -76,15 +180,15 @@ export default function Dashboard() {
   const renderDashboard = () => {
     switch (userProfile?.role) {
       case UserRole.ADMIN:
-        return <AdminDashboard stats={{ activeCasesCount, upcomingHearingsCount, clientsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} />;
+        return <AdminDashboard stats={{ activeCasesCount, upcomingHearingsCount, clientsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} activities={activities} />;
       case UserRole.LAWYER:
-        return <LawyerDashboard stats={{ activeCasesCount, upcomingHearingsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} />;
+        return <LawyerDashboard stats={{ activeCasesCount, upcomingHearingsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} activities={activities} myTasks={myTasks} />;
       case UserRole.STAFF:
-        return <StaffDashboard role={userProfile.role} stats={{ pendingTasksCount }} upcomingHearings={upcomingHearings} />;
+        return <StaffDashboard role={userProfile.role} stats={{ pendingTasksCount }} upcomingHearings={upcomingHearings} myTasks={myTasks} activities={activities} />;
       case UserRole.CLIENT:
         return <ClientDashboard />;
       default:
-        return <LawyerDashboard stats={{ activeCasesCount, upcomingHearingsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} />;
+        return <LawyerDashboard stats={{ activeCasesCount, upcomingHearingsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} activities={activities} myTasks={myTasks} />;
     }
   };
 
@@ -104,12 +208,16 @@ export default function Dashboard() {
         </div>
         {userProfile?.role !== UserRole.CLIENT && (
           <div className="flex items-center gap-3">
-            <button className="btn btn-secondary">
+            <button 
+              onClick={() => navigate('/calendar')}
+              className="btn btn-secondary">
               <Calendar className="w-4 h-4 mr-2" />
               View Calendar
             </button>
             {userProfile?.role === UserRole.ADMIN && (
-              <button className="btn btn-primary">
+              <button 
+                onClick={() => navigate('/new-case')}
+                className="btn btn-primary">
                 <Briefcase className="w-4 h-4 mr-2" />
                 Add New Case
               </button>
@@ -166,7 +274,7 @@ function AdminDashboard({ stats, upcomingHearings }: any) {
   );
 }
 
-function LawyerDashboard({ stats, upcomingHearings }: any) {
+function LawyerDashboard({ stats, upcomingHearings, activities = [] }: any) {
   const dashboardStats = [
     { label: 'My Active Cases', value: stats.activeCasesCount.toString(), change: '+2', trend: 'up', icon: Briefcase, color: 'text-primary-600', bg: 'bg-primary-50' },
     { label: 'My Hearings', value: stats.upcomingHearingsCount.toString(), change: 'Next: Tomorrow', trend: 'up', icon: Calendar, color: 'text-warning', bg: 'bg-warning/10' },
@@ -184,14 +292,14 @@ function LawyerDashboard({ stats, upcomingHearings }: any) {
         <UpcomingHearingsWidget hearings={upcomingHearings} count={stats.upcomingHearingsCount} />
         <div className="card p-6">
           <h3 className="text-lg font-bold text-neutral-900 mb-6">Recent Case Updates</h3>
-          <RecentActivityList />
+          <RecentActivityList activities={activities} />
         </div>
       </div>
     </div>
   );
 }
 
-function StaffDashboard({ role, stats, upcomingHearings }: any) {
+function StaffDashboard({ role, stats, upcomingHearings, myTasks = [], activities = [] }: any) {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -219,11 +327,11 @@ function StaffDashboard({ role, stats, upcomingHearings }: any) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="card p-6">
           <h3 className="text-lg font-bold text-neutral-900 mb-6">My Task List</h3>
-          <PriorityTasksList />
+          <PriorityTasksList tasks={myTasks} />
         </div>
         <div className="card p-6">
           <h3 className="text-lg font-bold text-neutral-900 mb-6">Case History & Updates</h3>
-          <RecentActivityList />
+          <RecentActivityList activities={activities} />
         </div>
       </div>
     </div>
@@ -344,54 +452,96 @@ function UpcomingHearingsWidget({ hearings, count }: any) {
   );
 }
 
-function RecentActivityList() {
+function RecentActivityList({ activities = [] }: any) {
+  const getIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'FileText':
+        return FileText;
+      case 'CheckCircle2':
+        return CheckCircle2;
+      case 'AlertCircle':
+        return AlertCircle;
+      default:
+        return FileText;
+    }
+  };
+
+  const getTimeAgo = (date: string) => {
+    const now = new Date();
+    const activityDate = new Date(date);
+    const diffMs = now.getTime() - activityDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return activityDate.toLocaleDateString();
+  };
+
   return (
     <div className="space-y-6 relative before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-neutral-100">
-      {[
-        { icon: FileText, color: 'text-info', bg: 'bg-info/10', text: 'New document "Evidence_A.pdf" uploaded to Case #2024-089', time: '2 hours ago' },
-        { icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10', text: 'Task "Client Meeting" marked as completed', time: '4 hours ago' },
-        { icon: AlertCircle, color: 'text-warning', bg: 'bg-warning/10', text: 'Hearing adjourned for Case #2023-112', time: 'Yesterday' },
-      ].map((activity, i) => (
-        <div key={i} className="flex gap-4 relative">
-          <div className={`w-8 h-8 rounded-full ${activity.bg} ${activity.color} flex items-center justify-center z-10 border-4 border-white`}>
-            <activity.icon className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-sm text-neutral-700 font-medium">{activity.text}</p>
-            <p className="text-xs text-neutral-400 mt-1">{activity.time}</p>
-          </div>
-        </div>
-      ))}
+      {activities.length > 0 ? (
+        activities.map((activity: any, i: number) => {
+          const IconComponent = getIcon(activity.icon);
+          return (
+            <div key={i} className="flex gap-4 relative">
+              <div className={`w-8 h-8 rounded-full ${activity.bg} ${activity.color} flex items-center justify-center z-10 border-4 border-white`}>
+                <IconComponent className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm text-neutral-700 font-medium">{activity.text}</p>
+                <p className="text-xs text-neutral-400 mt-1">{getTimeAgo(activity.time)}</p>
+              </div>
+            </div>
+          );
+        })
+      ) : (
+        <p className="text-sm text-neutral-500 italic text-center py-8">No recent activities.</p>
+      )}
     </div>
   );
 }
 
-function PriorityTasksList() {
+function PriorityTasksList({ tasks = [] }: any) {
+  const getDueDate = (dueDate: string) => {
+    const today = new Date();
+    const taskDate = new Date(dueDate);
+    const diffDays = Math.floor((taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays > 1 && diffDays < 7) return `${diffDays}d`;
+    return taskDate.toLocaleDateString('en-PK', { day: 'short', month: 'short' });
+  };
+
   return (
     <div className="space-y-3">
-      {[
-        { title: 'Draft Writ Petition', case: 'State vs. Ahmed', priority: 'High', due: 'Today' },
-        { title: 'Client Consultation', case: 'Malik Corp', priority: 'Medium', due: 'Tomorrow' },
-        { title: 'Research Precedents', case: 'Fatima vs. NADRA', priority: 'High', due: '24 Mar' },
-      ].map((task, i) => (
-        <div key={i} className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl border border-neutral-100 hover:border-primary-200 transition-all cursor-pointer">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded border-2 border-neutral-300"></div>
-            <div>
-              <h4 className="text-sm font-bold text-neutral-900">{task.title}</h4>
-              <p className="text-xs text-neutral-500">{task.case}</p>
+      {tasks.length > 0 ? (
+        tasks.map((task: any, i: number) => (
+          <div key={task._id || i} className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl border border-neutral-100 hover:border-primary-200 transition-all cursor-pointer">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded border-2 border-neutral-300"></div>
+              <div>
+                <h4 className="text-sm font-bold text-neutral-900">{task.title}</h4>
+                <p className="text-xs text-neutral-500">{task.caseId}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                task.priority === 'HIGH' ? 'bg-error/10 text-error' : task.priority === 'MEDIUM' ? 'bg-warning/10 text-warning' : 'bg-info/10 text-info'
+              }`}>
+                {task.priority}
+              </span>
+              <p className="text-[10px] text-neutral-400 mt-1 font-medium">Due {getDueDate(task.dueDate)}</p>
             </div>
           </div>
-          <div className="text-right">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-              task.priority === 'High' ? 'bg-error/10 text-error' : 'bg-info/10 text-info'
-            }`}>
-              {task.priority}
-            </span>
-            <p className="text-[10px] text-neutral-400 mt-1 font-medium">Due {task.due}</p>
-          </div>
-        </div>
-      ))}
+        ))
+      ) : (
+        <p className="text-sm text-neutral-500 italic text-center py-8">No tasks assigned.</p>
+      )}
     </div>
   );
 }
