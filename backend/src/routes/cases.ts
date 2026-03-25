@@ -10,13 +10,21 @@ router.get(
   authMiddleware,
   async (req: AuthRequest, res) => {
     try {
-      const { status, court, clientId, lawyer } = req.query;
+      const { status, court, clientId, lawyer, search } = req.query;
       const query: any = {};
 
       if (status && status !== 'All Statuses') query.status = status;
       if (court && court !== 'All Courts') query.court = court;
       if (clientId) query.clientId = clientId;
       if (lawyer) query.assignedLawyerUid = lawyer;
+
+      if (search) {
+        query.$or = [
+          { caseNumber: { $regex: search, $options: 'i' } },
+          { title: { $regex: search, $options: 'i' } },
+          { clientName: { $regex: search, $options: 'i' } },
+        ];
+      }
 
       const cases = await Case.find(query).sort({ createdAt: -1 });
       res.json(cases);

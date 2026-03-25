@@ -8,6 +8,8 @@ import authRoutes from './routes/auth.js';
 import caseRoutes from './routes/cases.js';
 import clientRoutes from './routes/clients.js';
 import taskRoutes from './routes/tasks.js';
+import billingRoutes from './routes/billing.js';
+import expenseRoutes from './routes/expenses.js';
 import setupGoogleOAuth from './config/oauth.js';
 
 dotenv.config();
@@ -44,6 +46,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/cases', caseRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
