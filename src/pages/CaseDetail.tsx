@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../components/FirebaseProvider';
 import { Case } from '../types';
-import { subscribeCaseById } from '../services/caseService';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -37,21 +37,62 @@ const tabs = [
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [relatedTasks, setRelatedTasks] = useState<any[]>([]);
+  const [caseHistory, setCaseHistory] = useState<any[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const toDate = (value: any): Date | null => {
-    if (!value) return null;
-    if (value instanceof Date) return value;
-    if (typeof value === 'string' || typeof value === 'number') {
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const fetchRelatedTasks = async (caseId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/tasks?caseId=${caseId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRelatedTasks(data);
+      }
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
     }
-    if (value?.toDate && typeof value.toDate === 'function') return value.toDate();
-    return null;
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!caseData || !user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/cases/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update case status');
+      }
+
+      const updatedCase = await response.json();
+      setCaseData({
+        ...caseData,
+        status: updatedCase.status,
+      });
+      setSuccessMessage(`Case status updated to ${newStatus}`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Error updating case:', err);
+    }
   };
 
   const generateAISummary = async () => {
@@ -71,13 +112,57 @@ export default function CaseDetail() {
   useEffect(() => {
     if (!id) return;
 
-    subscribeCaseById(id, (fetchedCase) => {
-      setCaseData(fetchedCase);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching case:", error);
-      setLoading(false);
-    });
+    const fetchCaseData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/cases/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Case not found');
+        }
+
+        const data = await response.json();
+        setCaseData({
+          id: data._id,
+          title: data.title,
+          caseNumber: data.caseNumber,
+          category: data.category,
+          priority: data.priority,
+          description: data.description,
+          court: data.court,
+          judge: data.judge,
+          status: data.status,
+          clientName: data.clientName,
+          clientId: data.clientId,
+          assignedLawyerUid: data.assignedLawyerUid,
+          assignedLawyerName: data.assignedLawyerName,
+          nextHearingDate: data.nextHearingDate,
+          lastActivityDate: data.lastActivityDate,
+          tags: data.tags || [],
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        });
+
+        // Fetch related tasks
+        await fetchRelatedTasks(id);
+
+        // Generate mock case history
+        setCaseHistory([
+          { date: new Date().toISOString(), action: 'Case Created', user: data.assignedLawyerName },
+        ]);
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching case:', err);
+        setLoading(false);
+      }
+    };
+
+    fetchCaseData();
   }, [id]);
 
   if (loading) {
@@ -104,11 +189,16 @@ export default function CaseDetail() {
     );
   }
 
-  const createdAtDate = toDate(caseData.createdAt);
-  const nextHearingDate = toDate(caseData.nextHearingDate);
-
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="p-4 bg-success/10 border border-success text-success rounded-lg flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <p className="font-medium">{successMessage}</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -119,11 +209,12 @@ export default function CaseDetail() {
             <ArrowLeft className="w-5 h-5 text-neutral-500" />
           </button>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-neutral-900">{caseData.title}</h1>
               <span className={`badge ${
                 caseData.status === 'ACTIVE' ? 'bg-primary-100 text-primary-700' :
                 caseData.status === 'PENDING' ? 'bg-warning/10 text-warning' :
+                caseData.status === 'CLOSED' ? 'bg-neutral-100 text-neutral-600' :
                 'bg-neutral-100 text-neutral-600'
               }`}>
                 {caseData.status}
@@ -137,7 +228,7 @@ export default function CaseDetail() {
               </span>
             </div>
             <p className="text-neutral-500 text-sm mt-1">
-              Case Number: {caseData.caseNumber} • Filed on {createdAtDate ? createdAtDate.toLocaleDateString('en-PK') : 'N/A'}
+              Case Number: {caseData.caseNumber} • Filed on {caseData.createdAt ? new Date(caseData.createdAt).toLocaleDateString('en-PK') : 'N/A'}
             </p>
           </div>
         </div>
@@ -146,10 +237,38 @@ export default function CaseDetail() {
             <Share2 className="w-4 h-4 mr-2" />
             Share
           </button>
-          <button className="btn btn-primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Update Status
-          </button>
+          <div className="group relative">
+            <button className="btn btn-primary">
+              <Plus className="w-4 h-4 mr-2" />
+              Update Status
+            </button>
+            <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-xl border border-neutral-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+              <button 
+                onClick={() => handleStatusChange('ACTIVE')}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 text-neutral-700"
+              >
+                Mark as Active
+              </button>
+              <button 
+                onClick={() => handleStatusChange('PENDING')}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 text-neutral-700"
+              >
+                Mark as Pending
+              </button>
+              <button 
+                onClick={() => handleStatusChange('ON_HOLD')}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 text-neutral-700"
+              >
+                Put On Hold
+              </button>
+              <button 
+                onClick={() => handleStatusChange('CLOSED')}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 text-neutral-700 rounded-b-lg"
+              >
+                Close Case
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -265,7 +384,7 @@ export default function CaseDetail() {
                       <div>
                         <p className="text-xs font-bold text-neutral-400 uppercase">Next Hearing</p>
                         <p className="text-sm font-bold text-neutral-900">
-                          {nextHearingDate ? nextHearingDate.toLocaleString('en-PK') : 'Not Scheduled'}
+                          {caseData.nextHearingDate ? new Date(caseData.nextHearingDate).toLocaleString('en-PK') : 'Not Scheduled'}
                         </p>
                       </div>
                     </div>
@@ -309,6 +428,139 @@ export default function CaseDetail() {
               </div>
             </>
           )}
+
+          {activeTab === 'history' && (
+            <div className="card p-6">
+              <h3 className="text-lg font-bold text-neutral-900 mb-6">Case Timeline</h3>
+              <div className="space-y-6">
+                {caseHistory.length > 0 ? (
+                  caseHistory.map((entry, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="w-3 h-3 rounded-full bg-primary-600"></div>
+                        {i < caseHistory.length - 1 && <div className="w-0.5 h-12 bg-neutral-200"></div>}
+                      </div>
+                      <div className="pb-6">
+                        <p className="font-bold text-neutral-900">{entry.action}</p>
+                        <p className="text-xs text-neutral-500 mt-1">
+                          {new Date(entry.date).toLocaleDateString('en-PK')} • {entry.user}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-neutral-500 text-center py-8">No case history available yet.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <div className="card p-6">
+              <h3 className="text-lg font-bold text-neutral-900 mb-6">Case Documents</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { name: 'Writ_Petition_Final.pdf', type: 'PDF', size: '2.4 MB', date: 'Mar 15, 2024' },
+                  { name: 'Evidence_Photos.zip', type: 'ZIP', size: '45 MB', date: 'Mar 12, 2024' },
+                  { name: 'Court_Order_Adjournment.pdf', type: 'PDF', size: '1.1 MB', date: 'Mar 05, 2024' },
+                  { name: 'Witness_Statement_1.docx', type: 'DOCX', size: '850 KB', date: 'Feb 28, 2024' },
+                ].map((doc, i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 bg-neutral-50 rounded-xl border border-neutral-100 hover:border-primary-200 transition-all group cursor-pointer">
+                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-primary-600 border border-neutral-200">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-neutral-900 truncate">{doc.name}</p>
+                      <p className="text-xs text-neutral-500 mt-0.5">{doc.size} • {doc.date}</p>
+                    </div>
+                    <button className="p-2 text-neutral-400 hover:text-neutral-600">
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'tasks' && (
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-neutral-900">Related Tasks</h3>
+                <button className="text-primary-600 text-sm font-medium hover:underline">Add Task</button>
+              </div>
+              {relatedTasks.length > 0 ? (
+                <div className="space-y-3">
+                  {relatedTasks.map((task: any) => (
+                    <div key={task._id} className="p-4 bg-neutral-50 rounded-xl border border-neutral-100 hover:border-primary-200 transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-bold text-neutral-900">{task.title}</p>
+                          <p className="text-xs text-neutral-500 mt-1">{task.description}</p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              task.status === 'COMPLETED' ? 'bg-success/10 text-success' :
+                              task.status === 'IN_PROGRESS' ? 'bg-primary-100 text-primary-600' :
+                              'bg-neutral-100 text-neutral-600'
+                            }`}>
+                              {task.status}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              task.priority === 'HIGH' ? 'bg-error/10 text-error' :
+                              task.priority === 'MEDIUM' ? 'bg-warning/10 text-warning' :
+                              'bg-neutral-100 text-neutral-600'
+                            }`}>
+                              {task.priority}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-neutral-500 text-center py-8">No tasks linked to this case yet.</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'billing' && (
+            <div className="card p-6">
+              <h3 className="text-lg font-bold text-neutral-900 mb-6">Billing Summary</h3>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-neutral-50 rounded-xl">
+                    <p className="text-xs font-bold text-neutral-500 uppercase">Total Hours</p>
+                    <p className="text-2xl font-bold text-neutral-900 mt-2">24.5</p>
+                  </div>
+                  <div className="p-4 bg-neutral-50 rounded-xl">
+                    <p className="text-xs font-bold text-neutral-500 uppercase">Total Costs</p>
+                    <p className="text-2xl font-bold text-neutral-900 mt-2">PKR 147,000</p>
+                  </div>
+                </div>
+                <div className="border-t border-neutral-200 pt-6">
+                  <h4 className="font-bold text-neutral-900 mb-4">Recent Entries</h4>
+                  <div className="space-y-3">
+                    {[
+                      { date: 'Mar 15, 2024', description: 'Court hearing preparation', hours: 3.5, rate: 5000 },
+                      { date: 'Mar 12, 2024', description: 'Document review', hours: 2.0, rate: 5000 },
+                      { date: 'Mar 10, 2024', description: 'Client consultation', hours: 1.5, rate: 5000 },
+                    ].map((entry, i) => (
+                      <div key={i} className="flex justify-between py-2 border-b border-neutral-100 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium text-neutral-900">{entry.description}</p>
+                          <p className="text-xs text-neutral-500">{entry.date}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-neutral-900">{entry.hours}h</p>
+                          <p className="text-xs text-neutral-500">PKR {entry.hours * entry.rate}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Sidebar Info */}
@@ -344,22 +596,22 @@ export default function CaseDetail() {
           <div className="card p-6 border-l-4 border-l-warning">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-neutral-900 uppercase tracking-wider">Next Hearing</h3>
-              {nextHearingDate && (
+              {caseData.nextHearingDate && (
                 <span className="badge bg-warning/10 text-warning">
-                  {Math.ceil((nextHearingDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Days Left
+                  {Math.ceil((new Date(caseData.nextHearingDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Days Left
                 </span>
               )}
             </div>
             <div className="space-y-4">
-              {nextHearingDate ? (
+              {caseData.nextHearingDate ? (
                 <>
                   <div>
                     <p className="text-xs font-bold text-neutral-400 uppercase">Date & Time</p>
                     <p className="text-sm font-bold text-neutral-900 mt-1">
-                      {nextHearingDate.toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      {new Date(caseData.nextHearingDate).toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
                     <p className="text-sm text-neutral-500">
-                      {nextHearingDate.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(caseData.nextHearingDate).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div>
