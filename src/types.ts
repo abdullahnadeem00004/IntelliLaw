@@ -88,15 +88,25 @@ export interface Task {
 }
 
 export interface LegalDocument {
-  id: string;
-  caseId: string;
+  _id?: string;
+  id?: string;
+  documentNumber: string;
   name: string;
-  type: string;
-  url: string;
-  uploadedBy: string;
-  uploadedAt: string;
-  size: number;
+  description?: string;
+  caseId: string;
   category: 'PLEADINGS' | 'EVIDENCE' | 'ORDERS' | 'CORRESPONDENCE' | 'OTHER';
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  uploadedBy: string;
+  uploadedAt: Date | string;
+  tags?: string[];
+  isVerified?: boolean;
+  confidentiality?: 'PUBLIC' | 'RESTRICTED' | 'CONFIDENTIAL';
+  size?: number; // alias for fileSize for compatibility
+  url?: string; // alias for fileUrl for compatibility
+  type?: string; // alias for fileType for compatibility
 }
 
 export interface Invoice {

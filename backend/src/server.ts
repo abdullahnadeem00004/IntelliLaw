@@ -4,12 +4,14 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import session from 'express-session';
 import passport from 'passport';
+import path from 'path';
 import authRoutes from './routes/auth.js';
 import caseRoutes from './routes/cases.js';
 import clientRoutes from './routes/clients.js';
 import taskRoutes from './routes/tasks.js';
 import billingRoutes from './routes/billing.js';
 import expenseRoutes from './routes/expenses.js';
+import documentRoutes from './routes/documents.js';
 import setupGoogleOAuth from './config/oauth.js';
 
 dotenv.config();
@@ -28,6 +30,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Session middleware for Passport
 app.use(session({
@@ -48,6 +53,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
