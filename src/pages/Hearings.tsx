@@ -19,7 +19,7 @@ import {
   X,
   Check
 } from 'lucide-react';
-import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay } from 'date-fns';
+import { format, addDays, startOfWeek, addWeeks, subWeeks, isSameDay, parseISO } from 'date-fns';
 
 export default function Hearings() {
   const { user } = useAuth();
