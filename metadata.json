@@ -1,0 +1,5 @@
+{
+  "name": "IntelliLaw",
+  "description": "AI-powered legal case management system for Pakistan, featuring real-time hearing tracking, AI case insights, and automated document management.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"]
+}
