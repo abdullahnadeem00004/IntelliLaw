@@ -155,7 +155,7 @@ export default function CaseList() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Success Message */}
       {successMessage && (
         <div className="p-4 bg-success/10 border border-success text-success rounded-lg flex items-start gap-3 animate-in">
@@ -183,7 +183,7 @@ export default function CaseList() {
       </div>
 
       {/* Filters & Search */}
-      <div className="card p-4 flex flex-col md:flex-row items-center gap-4">
+      <div className="card p-6 flex flex-col md:flex-row items-center gap-4">
         <div className="flex-1 w-full relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input 
@@ -218,24 +218,24 @@ export default function CaseList() {
       </div>
 
       {/* Case Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="card overflow-hidden min-h-[900px] flex flex-col">
+        <div className="overflow-x-auto flex-1">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-neutral-50 border-b border-neutral-200">
-                <th className="px-6 py-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">Case Info</th>
-                <th className="px-6 py-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">Court</th>
-                <th className="px-6 py-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">Priority</th>
-                <th className="px-6 py-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">Next Hearing</th>
-                <th className="px-6 py-4 text-xs font-bold text-neutral-500 uppercase tracking-wider">Last Activity</th>
-                <th className="px-6 py-4 text-xs font-bold text-neutral-500 uppercase tracking-wider"></th>
+                <th className="px-6 py-6 text-xs font-bold text-neutral-500 uppercase tracking-wider">Case Info</th>
+                <th className="px-6 py-6 text-xs font-bold text-neutral-500 uppercase tracking-wider">Court</th>
+                <th className="px-6 py-6 text-xs font-bold text-neutral-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-6 text-xs font-bold text-neutral-500 uppercase tracking-wider">Priority</th>
+                <th className="px-6 py-6 text-xs font-bold text-neutral-500 uppercase tracking-wider">Next Hearing</th>
+                <th className="px-6 py-6 text-xs font-bold text-neutral-500 uppercase tracking-wider">Last Activity</th>
+                <th className="px-6 py-6 text-xs font-bold text-neutral-500 uppercase tracking-wider"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-16 text-center">
                     <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto"></div>
                     <p className="text-sm text-neutral-500 mt-4">Loading cases...</p>
                   </td>
@@ -247,10 +247,10 @@ export default function CaseList() {
                     className="hover:bg-neutral-50 transition-colors group cursor-pointer"
                     onClick={() => navigate(`/cases/${c.id}`)}
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
-                          <Scale className="w-5 h-5" />
+                        <div className="w-12 h-12 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
+                          <Scale className="w-6 h-6" />
                         </div>
                         <div>
                           <p className="text-sm font-bold text-neutral-900">{c.title}</p>
@@ -258,29 +258,29 @@ export default function CaseList() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <p className="text-sm text-neutral-700 font-medium">{c.court || 'N/A'}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <span className={`badge ${CASE_STATUSES.find(s => s.value === c.status)?.color || 'bg-neutral-100 text-neutral-600'}`}>
                         {CASE_STATUSES.find(s => s.value === c.status)?.label || c.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <span className={`badge ${CASE_PRIORITIES.find(p => p.value === c.priority)?.color || 'bg-neutral-100 text-neutral-600'}`}>
                         {CASE_PRIORITIES.find(p => p.value === c.priority)?.label || c.priority || 'NORMAL'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-neutral-400" />
                         <span className="text-sm text-neutral-700 font-medium">{formatDate(c.nextHearingDate)}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-6">
                       <p className="text-sm text-neutral-500">{formatDate(c.lastActivityDate) || 'Just now'}</p>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-6 text-right">
                       <div className="group relative">
                         <button 
                           onClick={(e) => e.stopPropagation()}
@@ -323,7 +323,7 @@ export default function CaseList() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-16 text-center">
                     <div className="w-12 h-12 bg-neutral-100 rounded-full flex items-center justify-center text-neutral-300 mx-auto mb-4">
                       <Briefcase className="w-6 h-6" />
                     </div>
@@ -336,7 +336,7 @@ export default function CaseList() {
         </div>
         
         {/* Pagination */}
-        <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex items-center justify-between">
+        <div className="px-6 py-6 bg-neutral-50 border-t border-neutral-200 flex items-center justify-between">
           <p className="text-sm text-neutral-500">Showing <span className="font-bold text-neutral-900">{filteredCases.length}</span> cases</p>
           <div className="flex items-center gap-2">
             <button className="btn btn-secondary py-1.5 px-3 text-xs disabled:opacity-50">Previous</button>

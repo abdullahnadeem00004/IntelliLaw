@@ -214,14 +214,6 @@ export default function Dashboard() {
               <Calendar className="w-4 h-4 mr-2" />
               View Calendar
             </button>
-            {userProfile?.role === UserRole.ADMIN && (
-              <button 
-                onClick={() => navigate('/new-case')}
-                className="btn btn-primary">
-                <Briefcase className="w-4 h-4 mr-2" />
-                Add New Case
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -233,11 +225,13 @@ export default function Dashboard() {
 
 // Sub-components for different roles
 function AdminDashboard({ stats, upcomingHearings }: any) {
+  const navigate = useNavigate();
+
   const dashboardStats = [
-    { label: 'Total Active Cases', value: stats.activeCasesCount.toString(), change: '+12%', trend: 'up', icon: Briefcase, color: 'text-primary-600', bg: 'bg-primary-50' },
-    { label: 'Upcoming Hearings', value: stats.upcomingHearingsCount.toString(), change: '+4', trend: 'up', icon: Calendar, color: 'text-warning', bg: 'bg-warning/10' },
-    { label: 'Total Clients', value: stats.clientsCount.toString(), change: '+2', trend: 'up', icon: Users, color: 'text-success', bg: 'bg-success/10' },
-    { label: 'Pending Tasks', value: stats.pendingTasksCount.toString(), change: '-5%', trend: 'down', icon: Clock, color: 'text-info', bg: 'bg-info/10' },
+    { label: 'Total Active Cases', value: stats.activeCasesCount.toString(), change: '+12%', trend: 'up', icon: Briefcase, color: 'text-primary-600', bg: 'bg-primary-50', action: () => navigate('/cases') },
+    { label: 'Upcoming Hearings', value: stats.upcomingHearingsCount.toString(), change: '+4', trend: 'up', icon: Calendar, color: 'text-warning', bg: 'bg-warning/10', action: () => navigate('/hearings') },
+    { label: 'Total Clients', value: stats.clientsCount.toString(), change: '+2', trend: 'up', icon: Users, color: 'text-success', bg: 'bg-success/10', action: () => navigate('/clients') },
+    { label: 'Pending Tasks', value: stats.pendingTasksCount.toString(), change: '-5%', trend: 'down', icon: Clock, color: 'text-info', bg: 'bg-info/10', action: () => navigate('/tasks') },
   ];
 
   return (
@@ -275,10 +269,12 @@ function AdminDashboard({ stats, upcomingHearings }: any) {
 }
 
 function LawyerDashboard({ stats, upcomingHearings, activities = [] }: any) {
+  const navigate = useNavigate();
+
   const dashboardStats = [
-    { label: 'My Active Cases', value: stats.activeCasesCount.toString(), change: '+2', trend: 'up', icon: Briefcase, color: 'text-primary-600', bg: 'bg-primary-50' },
-    { label: 'My Hearings', value: stats.upcomingHearingsCount.toString(), change: 'Next: Tomorrow', trend: 'up', icon: Calendar, color: 'text-warning', bg: 'bg-warning/10' },
-    { label: 'My Tasks', value: stats.pendingTasksCount.toString(), change: '3 Due Today', trend: 'down', icon: Clock, color: 'text-info', bg: 'bg-info/10' },
+    { label: 'My Active Cases', value: stats.activeCasesCount.toString(), change: '+2', trend: 'up', icon: Briefcase, color: 'text-primary-600', bg: 'bg-primary-50', action: () => navigate('/cases') },
+    { label: 'My Hearings', value: stats.upcomingHearingsCount.toString(), change: 'Next: Tomorrow', trend: 'up', icon: Calendar, color: 'text-warning', bg: 'bg-warning/10', action: () => navigate('/hearings') },
+    { label: 'My Tasks', value: stats.pendingTasksCount.toString(), change: '3 Due Today', trend: 'down', icon: Clock, color: 'text-info', bg: 'bg-info/10', action: () => navigate('/tasks') },
   ];
 
   return (
@@ -300,10 +296,14 @@ function LawyerDashboard({ stats, upcomingHearings, activities = [] }: any) {
 }
 
 function StaffDashboard({ role, stats, upcomingHearings, myTasks = [], activities = [] }: any) {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card p-6 flex items-start justify-between">
+        <div 
+          onClick={() => navigate('/tasks')}
+          className="card p-6 flex items-start justify-between cursor-pointer hover:shadow-lg hover:scale-105 transition-all">
           <div>
             <p className="text-sm font-medium text-neutral-500">Assigned Tasks</p>
             <h3 className="text-2xl font-bold text-neutral-900 mt-1">{stats.pendingTasksCount}</h3>
@@ -313,7 +313,9 @@ function StaffDashboard({ role, stats, upcomingHearings, myTasks = [], activitie
             <Clock className="w-6 h-6" />
           </div>
         </div>
-        <div className="card p-6 flex items-start justify-between">
+        <div 
+          onClick={() => navigate('/hearings')}
+          className="card p-6 flex items-start justify-between cursor-pointer hover:shadow-lg hover:scale-105 transition-all">
           <div>
             <p className="text-sm font-medium text-neutral-500">Upcoming Hearings</p>
             <h3 className="text-2xl font-bold text-neutral-900 mt-1">{upcomingHearings.length}</h3>
@@ -396,7 +398,10 @@ function ClientDashboard() {
 // Helper UI Components
 function StatCard({ stat }: any) {
   return (
-    <div className="card p-6 flex items-start justify-between">
+    <div 
+      onClick={stat.action}
+      className="card p-6 flex items-start justify-between cursor-pointer hover:shadow-lg hover:scale-105 transition-all"
+    >
       <div>
         <p className="text-sm font-medium text-neutral-500">{stat.label}</p>
         <h3 className="text-2xl font-bold text-neutral-900 mt-1">{stat.value}</h3>

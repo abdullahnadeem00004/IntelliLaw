@@ -14,35 +14,30 @@ const router = Router();
 router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const firmId = req.user?.firmId;
 
-    // Get active cases count
+    // Get active cases count (all active/pending cases regardless of assignment)
     const activeCases = await Case.countDocuments({
       status: { $in: ['ACTIVE', 'PENDING'] },
-      firmId,
     });
 
     // Get upcoming hearings count
     const upcomingHearings = await Hearing.countDocuments({
       status: 'UPCOMING',
       date: { $gte: new Date() },
-      createdBy: userId,
     });
 
     // Get total clients count
-    const totalClients = await Client.countDocuments({ firmId });
+    const totalClients = await Client.countDocuments();
 
     // Get pending tasks count
     const pendingTasks = await Task.countDocuments({
       status: { $in: ['TODO', 'IN_PROGRESS'] },
-      assignedTo: userId,
     });
 
     // Get revenue (total invoiced amount)
     const invoices = await Invoice.aggregate([
       {
         $match: {
-          firmId,
           status: { $in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
         },
       },
@@ -59,9 +54,6 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => 
     // Get total expenses
     const expenses = await Expense.aggregate([
       {
-        $match: { firmId },
-      },
-      {
         $group: {
           _id: null,
           total: { $sum: '$amount' },
@@ -73,7 +65,6 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => 
 
     // Get recent documents count
     const recentDocuments = await Document.countDocuments({
-      firmId,
       createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, // Last 7 days
     });
 
@@ -96,13 +87,11 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => 
 // Get upcoming hearings for widget
 router.get('/upcoming-hearings', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 5;
 
     const hearings = await Hearing.find({
       status: 'UPCOMING',
       date: { $gte: new Date() },
-      createdBy: userId,
     })
       .sort({ date: 1 })
       .limit(limit)

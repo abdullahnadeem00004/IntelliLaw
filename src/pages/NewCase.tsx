@@ -146,24 +146,65 @@ export default function NewCase() {
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
   const handleSubmit = async () => {
-    if (!user) return;
+    if (!user) {
+      setError('User not authenticated');
+      return;
+    }
+
+    // Validate all required fields
+    if (!formData.title.trim()) {
+      setError('Case title is required');
+      return;
+    }
+
+    if (!formData.caseNumber.trim()) {
+      setError('Case number is required');
+      return;
+    }
+
+    if (!formData.clientName.trim()) {
+      setError('Client name is required');
+      return;
+    }
+
+    if (!formData.court.trim()) {
+      setError('Court is required');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      await createCase({
-        title: formData.title,
-        caseNumber: formData.caseNumber,
-        category: formData.type,
-        priority: formData.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
-        description: formData.description,
-        court: formData.court,
-        judge: formData.judge,
-        clientName: formData.clientName,
-        assignedLawyerUid: user.uid,
-        assignedLawyerName: user.displayName || user.email || 'Assigned Lawyer',
-        nextHearingDate: formData.nextHearingDate || null,
+      const response = await fetch('http://localhost:5000/api/cases', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          title: formData.title.trim(),
+          caseNumber: formData.caseNumber.trim(),
+          category: formData.type,
+          priority: formData.priority,
+          description: formData.description,
+          court: formData.court,
+          judge: formData.judge || undefined,
+          clientName: formData.clientName.trim(),
+          assignedLawyerUid: user.uid,
+          assignedLawyerName: user.displayName || user.email || 'Assigned Lawyer',
+          nextHearingDate: formData.nextHearingDate || null,
+          status: 'ACTIVE',
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create case');
+      }
+
+      const createdCase = await response.json();
+      console.log('Case created successfully:', createdCase);
       navigate('/cases');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create case. Please try again.';
@@ -244,6 +285,10 @@ export default function NewCase() {
         {currentStep === 1 && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h3 className="text-xl font-bold text-neutral-900">Basic Case Information</h3>
+            <div className="p-4 bg-info/10 border border-info/20 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-info mt-0.5" />
+              <p className="text-sm text-info"><span className="font-bold">Required fields:</span> Case Title and Case Number</p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-neutral-500 uppercase">Case Title</label>
@@ -312,6 +357,10 @@ export default function NewCase() {
         {currentStep === 2 && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h3 className="text-xl font-bold text-neutral-900">Client Information</h3>
+            <div className="p-4 bg-info/10 border border-info/20 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-info mt-0.5" />
+              <p className="text-sm text-info"><span className="font-bold">Required field:</span> Client Name</p>
+            </div>
             <div className="p-4 bg-primary-50 rounded-xl border border-primary-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <User className="w-5 h-5 text-primary-600" />
@@ -378,6 +427,10 @@ export default function NewCase() {
         {currentStep === 3 && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h3 className="text-xl font-bold text-neutral-900">Legal & Court Details</h3>
+            <div className="p-4 bg-info/10 border border-info/20 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-info mt-0.5" />
+              <p className="text-sm text-info"><span className="font-bold">Required field:</span> Court Name</p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-neutral-500 uppercase">Court Name</label>
@@ -490,8 +543,14 @@ export default function NewCase() {
 
           <button 
             onClick={nextStep}
-            disabled={loading || (currentStep === 1 && (!formData.title || !formData.caseNumber)) || (currentStep === 2 && !formData.clientName) || (currentStep === 3 && !formData.court)}
+            disabled={loading || 
+              (currentStep === 1 && (!formData.title.trim() || !formData.caseNumber.trim())) || 
+              (currentStep === 2 && !formData.clientName.trim()) || 
+              (currentStep === 3 && !formData.court.trim()) ||
+              (currentStep === 4 && loading)
+            }
             className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            title={currentStep === steps.length ? 'Click to create case' : 'Click to proceed'}
           >
             {currentStep === steps.length ? (
               <>
