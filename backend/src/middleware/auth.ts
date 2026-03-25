@@ -5,6 +5,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key_here';
 
 export interface AuthRequest extends Request {
   userId?: string;
+  userRole?: string;
   user?: any;
 }
 
@@ -18,6 +19,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 
     const decoded = jwt.decode(token, JWT_SECRET);
     req.userId = decoded.userId;
+    req.userRole = decoded.role;
     req.user = decoded;
     next();
   } catch (error) {
