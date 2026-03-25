@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Lock
+  Lock,
+  Search,
+  X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/FirebaseProvider';
@@ -35,6 +37,12 @@ export default function NewCase() {
   const [error, setError] = useState('');
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
+
+  // Search state
+  const [showClientSearch, setShowClientSearch] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [clientSearchResults, setClientSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Check if user has permission to create cases
   const canCreateCase = userProfile && [UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN].includes(userProfile.role);
@@ -76,6 +84,55 @@ export default function NewCase() {
 
   const handlePhoneChange = (phone: string) => {
     setFormData(prev => ({ ...prev, clientPhone: phone }));
+  };
+
+  const searchClients = async (query: string) => {
+    if (!query.trim()) {
+      setClientSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/clients?search=${encodeURIComponent(query)}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to search clients');
+      }
+
+      const data = await response.json();
+      setClientSearchResults(data);
+    } catch (err) {
+      console.error('Error searching clients:', err);
+      setClientSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectClient = (client: any) => {
+    setFormData(prev => ({
+      ...prev,
+      clientName: client.displayName,
+      clientEmail: client.email || '',
+      clientPhone: client.phoneNumber || '',
+      clientType: client.type || 'Individual',
+      clientAddress: client.address || {
+        province: '',
+        district: '',
+        city: '',
+        area: '',
+        postalCode: '',
+      },
+    }));
+    setShowClientSearch(false);
+    setClientSearchQuery('');
+    setClientSearchResults([]);
   };
 
   const nextStep = () => {
@@ -260,7 +317,12 @@ export default function NewCase() {
                 <User className="w-5 h-5 text-primary-600" />
                 <span className="text-sm font-bold text-primary-700">Existing Client?</span>
               </div>
-              <button className="btn btn-primary py-1.5 px-3 text-xs">Search Database</button>
+              <button 
+                onClick={() => setShowClientSearch(true)}
+                className="btn btn-primary py-1.5 px-3 text-xs"
+              >
+                Search Database
+              </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -410,8 +472,130 @@ export default function NewCase() {
             </div>
           </div>
         )}
+
+        {/* Navigation Buttons */}
+        <div className="mt-8 flex items-center justify-between pt-6 border-t border-neutral-200">
+          <button 
+            onClick={prevStep}
+            disabled={currentStep === 1}
+            className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4 mr-2" />
+            Previous
+          </button>
+          
+          <div className="flex items-center gap-2 text-sm text-neutral-500">
+            Step <span className="font-bold text-neutral-900">{currentStep}</span> of <span className="font-bold text-neutral-900">{steps.length}</span>
+          </div>
+
+          <button 
+            onClick={nextStep}
+            disabled={loading || (currentStep === 1 && (!formData.title || !formData.caseNumber)) || (currentStep === 2 && !formData.clientName) || (currentStep === 3 && !formData.court)}
+            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {currentStep === steps.length ? (
+              <>
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                {loading ? 'Creating...' : 'Create Case'}
+              </>
+            ) : (
+              <>
+                Next
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </>
+            )}
+          </button>
+        </div>
       </div>
         </>
+      )}
+
+      {/* Client Search Modal */}
+      {showClientSearch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b border-neutral-100 flex items-center justify-between sticky top-0 bg-white">
+              <h2 className="text-xl font-bold text-neutral-900">Search Existing Clients</h2>
+              <button 
+                onClick={() => {
+                  setShowClientSearch(false);
+                  setClientSearchQuery('');
+                  setClientSearchResults([]);
+                }}
+                className="p-2 hover:bg-neutral-100 rounded-xl transition-all"
+              >
+                <X className="w-5 h-5 text-neutral-400" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                <input 
+                  type="text"
+                  placeholder="Search by name, email, or phone..."
+                  value={clientSearchQuery}
+                  onChange={(e) => {
+                    setClientSearchQuery(e.target.value);
+                    searchClients(e.target.value);
+                  }}
+                  className="input-field pl-10 w-full"
+                  autoFocus
+                />
+              </div>
+
+              {isSearching && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
+                </div>
+              )}
+
+              {!isSearching && clientSearchResults.length > 0 && (
+                <div className="space-y-2">
+                  {clientSearchResults.map((client) => (
+                    <button
+                      key={client._id}
+                      onClick={() => handleSelectClient(client)}
+                      className="w-full p-4 text-left border border-neutral-200 rounded-xl hover:border-primary-300 hover:bg-primary-50 transition-all group"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-neutral-900">{client.displayName}</p>
+                          <p className="text-xs text-neutral-500 mt-1">
+                            {client.email && <span>{client.email}</span>}
+                            {client.email && client.phoneNumber && <span> • </span>}
+                            {client.phoneNumber && <span>{client.phoneNumber}</span>}
+                          </p>
+                          {client.type && (
+                            <span className="inline-block mt-2 text-xs px-2 py-1 bg-neutral-100 text-neutral-600 rounded">
+                              {client.type}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity text-sm font-bold">
+                          Select →
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!isSearching && clientSearchQuery && clientSearchResults.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-neutral-500">No clients found matching your search.</p>
+                  <p className="text-sm text-neutral-400 mt-2">Try a different search term or create a new client.</p>
+                </div>
+              )}
+
+              {!isSearching && !clientSearchQuery && clientSearchResults.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-neutral-500">Enter a name, email, or phone number to search.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

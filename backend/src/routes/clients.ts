@@ -11,7 +11,7 @@ router.get(
   authMiddleware,
   async (req: AuthRequest, res) => {
     try {
-      const { firmId } = req.query;
+      const { firmId, search } = req.query;
       const query: any = {};
 
       // Lawyers and staff can only see clients they created or clients for their firm
@@ -22,6 +22,15 @@ router.get(
         ];
       } else if (firmId) {
         query.firmId = firmId;
+      }
+
+      // Search filter
+      if (search) {
+        query.$or = [
+          { displayName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { phoneNumber: { $regex: search, $options: 'i' } },
+        ];
       }
 
       const clients = await Client.find(query).sort({ createdAt: -1 });

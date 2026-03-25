@@ -10,24 +10,34 @@ import { Search,
   Download,
   FileText,
   AlertCircle,
-  Loader2
+  Loader2,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/FirebaseProvider';
 import { CASE_STATUSES, CASE_PRIORITIES, PAKISTAN_COURTS } from '../constants';
 import { Case, UserRole } from '../types';
-import { subscribeCases } from '../services/caseService';
 
 export default function CaseList() {
   const { user, userProfile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All Statuses');
+  const [courtFilter, setCourtFilter] = useState('All Courts');
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const formatDate = (value: any) => {
     if (!value) return '-';
-    if (typeof value === 'string') return value;
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      return date.toLocaleDateString('en-PK');
+    }
+    if (value instanceof Date) {
+      return value.toLocaleDateString('en-PK');
+    }
     if (value?.toDate && typeof value.toDate === 'function') {
       return value.toDate().toLocaleDateString('en-PK');
     }
@@ -35,23 +45,125 @@ export default function CaseList() {
   };
 
   useEffect(() => {
-    subscribeCases((casesData) => {
-      setCases(casesData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching cases:", error);
-      setLoading(false);
-    });
+    fetchCases();
   }, []);
 
-  const filteredCases = cases.filter(c => 
-    c.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.caseNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const fetchCases = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/cases', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch cases');
+      }
+
+      const data = await response.json();
+      const formattedCases = data.map((caseItem: any) => ({
+        id: caseItem._id,
+        title: caseItem.title,
+        caseNumber: caseItem.caseNumber,
+        category: caseItem.category,
+        priority: caseItem.priority,
+        description: caseItem.description,
+        court: caseItem.court,
+        judge: caseItem.judge,
+        status: caseItem.status,
+        clientName: caseItem.clientName,
+        clientId: caseItem.clientId,
+        assignedLawyerUid: caseItem.assignedLawyerUid,
+        assignedLawyerName: caseItem.assignedLawyerName,
+        nextHearingDate: caseItem.nextHearingDate,
+        lastActivityDate: caseItem.lastActivityDate,
+        tags: caseItem.tags || [],
+        createdAt: caseItem.createdAt,
+        updatedAt: caseItem.updatedAt,
+      }));
+      setCases(formattedCases);
+    } catch (error) {
+      console.error('Error fetching cases:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCase = async (caseId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this case?')) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/cases/${caseId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete case');
+      }
+
+      setSuccessMessage('Case deleted successfully!');
+      await fetchCases();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error('Error deleting case:', error);
+    }
+  };
+
+  const handleStatusChange = async (caseId: string, newStatus: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/cases/${caseId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update case status');
+      }
+
+      setSuccessMessage('Case status updated!');
+      await fetchCases();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error('Error updating case:', error);
+    }
+  };
+
+  const filteredCases = cases.filter(c => {
+    const matchesSearch = 
+      c.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.caseNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter === 'All Statuses' || c.status === statusFilter;
+    const matchesCourt = courtFilter === 'All Courts' || c.court === courtFilter;
+
+    return matchesSearch && matchesStatus && matchesCourt;
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="p-4 bg-success/10 border border-success text-success rounded-lg flex items-start gap-3 animate-in">
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <p className="font-medium">{successMessage}</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -83,11 +195,19 @@ export default function CaseList() {
           />
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <select className="input-field py-2 text-sm w-full md:w-40">
+          <select 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="input-field py-2 text-sm w-full md:w-40"
+          >
             <option>All Statuses</option>
             {CASE_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
-          <select className="input-field py-2 text-sm w-full md:w-40">
+          <select 
+            value={courtFilter}
+            onChange={(e) => setCourtFilter(e.target.value)}
+            className="input-field py-2 text-sm w-full md:w-40"
+          >
             <option>All Courts</option>
             {PAKISTAN_COURTS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -161,15 +281,43 @@ export default function CaseList() {
                       <p className="text-sm text-neutral-500">{formatDate(c.lastActivityDate) || 'Just now'}</p>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Handle more actions
-                        }}
-                        className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200 rounded-lg transition-all"
-                      >
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
+                      <div className="group relative">
+                        <button 
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200 rounded-lg transition-all"
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                        <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-xl border border-neutral-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                          <button 
+                            onClick={(e) => navigate(`/cases/${c.id}`)}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-neutral-700"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            View Details
+                          </button>
+                          <div className="border-t border-neutral-100">
+                            <button 
+                              onClick={(e) => handleStatusChange(c.id, c.status === 'ACTIVE' ? 'ON_HOLD' : 'ACTIVE', e)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 text-neutral-700"
+                            >
+                              {c.status === 'ACTIVE' ? 'Put On Hold' : 'Reactivate'}
+                            </button>
+                            <button 
+                              onClick={(e) => handleStatusChange(c.id, 'CLOSED', e)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 text-neutral-700"
+                            >
+                              Close Case
+                            </button>
+                          </div>
+                          <button 
+                            onClick={(e) => handleDeleteCase(c.id, e)}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-error/10 text-error rounded-b-lg"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))

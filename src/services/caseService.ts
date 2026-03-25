@@ -60,7 +60,64 @@ export async function subscribeCases(onData: (cases: Case[]) => void, onError?: 
     });
     const casesData = response.data.map((item: any) => ({
       id: item._id,
-      ...item,
+      title: item.title,
+      caseNumber: item.caseNumber,
+      category: item.category,
+      priority: item.priority,
+      description: item.description,
+      court: item.court,
+      judge: item.judge,
+      status: item.status,
+      clientName: item.clientName,
+      clientId: item.clientId,
+      assignedLawyerUid: item.assignedLawyerUid,
+      assignedLawyerName: item.assignedLawyerName,
+      nextHearingDate: item.nextHearingDate,
+      lastActivityDate: item.lastActivityDate,
+      tags: item.tags || [],
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    })) as Case[];
+    onData(casesData);
+  } catch (error) {
+    if (onError) onError(error);
+  }
+}
+
+export async function subscribeCasesByFilter(
+  filters: { status?: string; court?: string; clientId?: string; lawyer?: string },
+  onData: (cases: Case[]) => void,
+  onError?: (error: unknown) => void
+) {
+  try {
+    const queryParams = new URLSearchParams();
+    if (filters.status && filters.status !== 'All Statuses') queryParams.append('status', filters.status);
+    if (filters.court && filters.court !== 'All Courts') queryParams.append('court', filters.court);
+    if (filters.clientId) queryParams.append('clientId', filters.clientId);
+    if (filters.lawyer) queryParams.append('lawyer', filters.lawyer);
+
+    const response = await axios.get(`${API_BASE_URL}/cases?${queryParams.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    const casesData = response.data.map((item: any) => ({
+      id: item._id,
+      title: item.title,
+      caseNumber: item.caseNumber,
+      category: item.category,
+      priority: item.priority,
+      description: item.description,
+      court: item.court,
+      judge: item.judge,
+      status: item.status,
+      clientName: item.clientName,
+      clientId: item.clientId,
+      assignedLawyerUid: item.assignedLawyerUid,
+      assignedLawyerName: item.assignedLawyerName,
+      nextHearingDate: item.nextHearingDate,
+      lastActivityDate: item.lastActivityDate,
+      tags: item.tags || [],
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
     })) as Case[];
     onData(casesData);
   } catch (error) {
@@ -79,10 +136,43 @@ export async function subscribeCaseById(
     });
     const caseData = {
       id: response.data._id,
-      ...response.data,
+      title: response.data.title,
+      caseNumber: response.data.caseNumber,
+      category: response.data.category,
+      priority: response.data.priority,
+      description: response.data.description,
+      court: response.data.court,
+      judge: response.data.judge,
+      status: response.data.status,
+      clientName: response.data.clientName,
+      clientId: response.data.clientId,
+      assignedLawyerUid: response.data.assignedLawyerUid,
+      assignedLawyerName: response.data.assignedLawyerName,
+      nextHearingDate: response.data.nextHearingDate,
+      lastActivityDate: response.data.lastActivityDate,
+      tags: response.data.tags || [],
+      createdAt: response.data.createdAt,
+      updatedAt: response.data.updatedAt,
     } as Case;
     onData(caseData);
   } catch (error) {
     if (onError) onError(error);
   }
+}
+
+export async function updateCase(caseId: string, updates: Partial<Case>) {
+  const response = await axios.put(`${API_BASE_URL}/cases/${caseId}`, updates, {
+    headers: getAuthHeaders(),
+  });
+  return {
+    id: response.data._id,
+    ...response.data,
+  } as Case;
+}
+
+export async function deleteCase(caseId: string) {
+  const response = await axios.delete(`${API_BASE_URL}/cases/${caseId}`, {
+    headers: getAuthHeaders(),
+  });
+  return response.data;
 }
