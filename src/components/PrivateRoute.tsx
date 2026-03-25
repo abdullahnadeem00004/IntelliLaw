@@ -10,7 +10,8 @@ interface PrivateRouteProps {
 
 /**
  * PrivateRoute component to protect routes based on authentication and user role
- * 
+ * Also checks if user profile is complete, redirecting to onboarding if needed
+ *
  * @param children - The component to render if authorized
  * @param allowedRoles - Array of roles allowed to access this route. If empty, any authenticated user is allowed
  */
@@ -29,7 +30,22 @@ export default function PrivateRoute({ children, allowedRoles = [] }: PrivateRou
   // Not authenticated - redirect to login
   if (!user || !userProfile) {
     console.warn('🔒 PrivateRoute: User not authenticated, redirecting to login');
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/role-selection" replace />;
+  }
+
+  // Check if profile is complete
+  const isProfileComplete = (userProfile as any).isProfileComplete || (userProfile as any).isProfileComplete === undefined;
+  const userType = (userProfile as any).userType;
+
+  if (!isProfileComplete && userType) {
+    console.warn(`📋 PrivateRoute: User profile incomplete, redirecting to ${userType} onboarding`);
+    if (userType === 'FIRM') {
+      return <Navigate to="/onboarding/firm" replace />;
+    } else if (userType === 'LAWYER') {
+      return <Navigate to="/onboarding/lawyer" replace />;
+    } else if (userType === 'CLIENT') {
+      return <Navigate to="/onboarding/client" replace />;
+    }
   }
 
   // No role restrictions - allow access

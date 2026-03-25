@@ -1,6 +1,39 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcryptjs from 'bcryptjs';
 
+export interface FirmProfile {
+  firmName: string;
+  firmLicense: string;
+  country: string;
+  city: string;
+  address: string;
+  phoneNumber: string;
+  website?: string;
+  numberOfLawyers?: number;
+  specialization?: string;
+}
+
+export interface LawyerProfile {
+  fullName: string;
+  licenseNumber: string;
+  specialization: string;
+  yearsOfExperience: number;
+  barCouncil: string;
+  phoneNumber: string;
+  address?: string;
+  firmName?: string;
+}
+
+export interface ClientProfile {
+  fullName: string;
+  phoneNumber: string;
+  address: string;
+  city: string;
+  cnic?: string;
+  companyName?: string;
+  isIndividual: boolean;
+}
+
 export interface IUser extends Document {
   email: string;
   password: string;
@@ -8,6 +41,11 @@ export interface IUser extends Document {
   photoURL?: string;
   googleId?: string;
   role: 'ADMIN' | 'LAWYER' | 'CLIENT' | 'STAFF';
+  userType: 'FIRM' | 'LAWYER' | 'CLIENT';
+  firmProfile?: FirmProfile;
+  lawyerProfile?: LawyerProfile;
+  clientProfile?: ClientProfile;
+  isProfileComplete: boolean;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;
@@ -42,6 +80,45 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['ADMIN', 'LAWYER', 'CLIENT', 'STAFF'],
       default: 'CLIENT',
+    },
+    userType: {
+      type: String,
+      enum: ['FIRM', 'LAWYER', 'CLIENT'],
+      default: 'CLIENT',
+    },
+    isProfileComplete: {
+      type: Boolean,
+      default: false,
+    },
+    firmProfile: {
+      firmName: String,
+      firmLicense: String,
+      country: String,
+      city: String,
+      address: String,
+      phoneNumber: String,
+      website: String,
+      numberOfLawyers: Number,
+      specialization: String,
+    },
+    lawyerProfile: {
+      fullName: String,
+      licenseNumber: String,
+      specialization: String,
+      yearsOfExperience: Number,
+      barCouncil: String,
+      phoneNumber: String,
+      address: String,
+      firmName: String,
+    },
+    clientProfile: {
+      fullName: String,
+      phoneNumber: String,
+      address: String,
+      city: String,
+      cnic: String,
+      companyName: String,
+      isIndividual: Boolean,
     },
   },
   { timestamps: true }

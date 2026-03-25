@@ -35,6 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: currentUser.email,
           photoURL: currentUser.photoURL,
           role: (currentUser.role as UserRole) || UserRole.CLIENT,
+          userType: (currentUser as any).userType,
+          isProfileComplete: (currentUser as any).isProfileComplete,
           createdAt: new Date().toISOString()
         });
       } else {

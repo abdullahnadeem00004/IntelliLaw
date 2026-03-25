@@ -5,12 +5,14 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 export interface LoginCredentials {
   email: string;
   password: string;
+  role?: 'FIRM' | 'LAWYER' | 'CLIENT';
 }
 
 export interface SignupCredentials {
   email: string;
   password: string;
   displayName: string;
+  role?: 'FIRM' | 'LAWYER' | 'CLIENT';
 }
 
 export interface AuthResponse {
@@ -19,6 +21,8 @@ export interface AuthResponse {
   displayName: string;
   photoURL?: string;
   role: string;
+  userType?: 'FIRM' | 'LAWYER' | 'CLIENT';
+  isProfileComplete?: boolean;
   token: string;
 }
 
@@ -28,6 +32,8 @@ export interface User {
   displayName: string;
   photoURL?: string;
   role: string;
+  userType?: 'FIRM' | 'LAWYER' | 'CLIENT';
+  isProfileComplete?: boolean;
 }
 
 // API calls for authentication
@@ -55,7 +61,7 @@ export const authAPI = {
   getCurrentUser: async (): Promise<User | null> => {
     const token = localStorage.getItem('token');
     console.log('🔑 Getting current user - token exists:', !!token);
-    
+
     if (!token) {
       console.log('❌ No token found in localStorage');
       return null;
@@ -64,7 +70,7 @@ export const authAPI = {
     try {
       console.log('📡 Calling /api/auth/me with token...');
       const response = await axios.get(`${API_BASE_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       console.log('✅ User fetched successfully:', response.data.email);
       return response.data;
@@ -73,6 +79,42 @@ export const authAPI = {
       localStorage.removeItem('token');
       return null;
     }
+  },
+
+  completeFirmProfile: async (firmProfile: any): Promise<any> => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await axios.post(`${API_BASE_URL}/auth/complete-firm-profile`, { firmProfile }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  },
+
+  completeLawyerProfile: async (lawyerProfile: any): Promise<any> => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await axios.post(`${API_BASE_URL}/auth/complete-lawyer-profile`, { lawyerProfile }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  },
+
+  completeClientProfile: async (clientProfile: any): Promise<any> => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await axios.post(`${API_BASE_URL}/auth/complete-client-profile`, { clientProfile }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
   },
 
   getToken: () => localStorage.getItem('token'),

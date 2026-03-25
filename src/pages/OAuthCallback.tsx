@@ -6,6 +6,7 @@ import { AlertCircle } from 'lucide-react';
 /**
  * Component that handles Google OAuth callback
  * Extracts token from URL params and stores it in localStorage
+ * Redirects to appropriate onboarding page based on user type
  */
 export default function OAuthCallback() {
   const [searchParams] = useSearchParams();
@@ -17,9 +18,10 @@ export default function OAuthCallback() {
   useEffect(() => {
     const token = searchParams.get('token');
     const userId = searchParams.get('userId');
+    const userType = searchParams.get('userType');
     const errorCode = searchParams.get('error');
 
-    console.log('🔍 OAuth callback params:', { token: !!token, userId: !!userId, errorCode });
+    console.log('🔍 OAuth callback params:', { token: !!token, userId: !!userId, userType, errorCode });
 
     // Handle OAuth errors
     if (errorCode) {
@@ -31,7 +33,7 @@ export default function OAuthCallback() {
       const msg = errorMessages[errorCode] || `OAuth error: ${errorCode}`;
       console.error('❌ OAuth Error:', msg);
       setError(msg);
-      setTimeout(() => navigate('/login', { replace: true }), 3000);
+      setTimeout(() => navigate('/role-selection', { replace: true }), 3000);
       return;
     }
 
@@ -40,7 +42,7 @@ export default function OAuthCallback() {
       // Store token in localStorage
       localStorage.setItem('token', token);
       setHasStoredToken(true);
-      
+
       // Trigger token-changed event to notify AuthProvider
       console.log('📢 Dispatching token-changed event');
       window.dispatchEvent(new Event('token-changed'));
@@ -51,19 +53,36 @@ export default function OAuthCallback() {
   useEffect(() => {
     if (hasStoredToken && isAuthReady) {
       console.log('👤 Auth ready check - user:', !!user, 'loading:', loading);
-      
+
       if (user) {
-        console.log('✅ User authenticated! Redirecting to dashboard');
-        // Small delay to ensure all state updates are processed
-        setTimeout(() => {
+        console.log('✅ User authenticated! Checking profile completion...', { userType: (user as any).userType, isProfileComplete: (user as any).isProfileComplete });
+
+        // Redirect based on user type and profile completion
+        if (!(user as any).isProfileComplete) {
+          const userType = (user as any).userType;
+          if (userType === 'FIRM') {
+            console.log('📋 Redirecting to firm onboarding');
+            navigate('/onboarding/firm', { replace: true });
+          } else if (userType === 'LAWYER') {
+            console.log('📋 Redirecting to lawyer onboarding');
+            navigate('/onboarding/lawyer', { replace: true });
+          } else if (userType === 'CLIENT') {
+            console.log('📋 Redirecting to client onboarding');
+            navigate('/onboarding/client', { replace: true });
+          } else {
+            console.log('🔁 Unknown user type, redirecting to dashboard');
+            navigate('/', { replace: true });
+          }
+        } else {
+          console.log('✅ Profile already complete! Redirecting to dashboard');
           navigate('/', { replace: true });
-        }, 100);
+        }
       } else if (!loading) {
         console.warn('⚠️  User not found after auth check');
         // Only show error if auth is ready and still no user
         setTimeout(() => {
-          console.log('🔁 Auth check failed, redirecting to login');
-          navigate('/login', { replace: true });
+          console.log('🔁 Auth check failed, redirecting to role selection');
+          navigate('/role-selection', { replace: true });
         }, 500);
       }
     }
@@ -96,7 +115,7 @@ export default function OAuthCallback() {
         <p className="text-xs text-neutral-400 mt-2">
           {!hasStoredToken && 'Extracting token...'}
           {hasStoredToken && !isAuthReady && 'Verifying credentials...'}
-          {hasStoredToken && isAuthReady && 'Redirecting...'}
+          {hasStoredToken && isAuthReady && 'Setting up your profile...'}
         </p>
       </div>
     </div>

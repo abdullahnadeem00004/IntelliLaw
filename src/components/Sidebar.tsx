@@ -61,7 +61,7 @@ export default function Sidebar() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login', { replace: true });
+    navigate('/role-selection', { replace: true });
   };
 
   // Filter navigation items based on user role

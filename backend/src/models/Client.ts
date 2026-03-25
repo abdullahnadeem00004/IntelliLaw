@@ -1,7 +1,6 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, ObjectId } from 'mongoose';
 
 export interface IClient extends Document {
-  _id: string;
   displayName: string;
   email?: string;
   phoneNumber?: string;

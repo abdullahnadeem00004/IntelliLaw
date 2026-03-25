@@ -18,6 +18,8 @@ export interface UserProfile {
   photoURL?: string;
   phoneNumber?: string;
   type?: string; // Added for client type (Individual/Corporate)
+  userType?: 'FIRM' | 'LAWYER' | 'CLIENT';
+  isProfileComplete?: boolean;
   createdAt: string;
 }
 

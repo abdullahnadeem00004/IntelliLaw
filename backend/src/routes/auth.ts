@@ -1,4 +1,5 @@
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
+import session from 'express-session';
 import User from '../models/User.js';
 import { authMiddleware, generateToken, AuthRequest } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/rbac.js';
@@ -6,16 +7,37 @@ import passport from 'passport';
 
 const router = Router();
 
+// Map userType to role
+const getUserRoleByType = (userType: string) => {
+  if (userType === 'FIRM' || userType === 'LAWYER') {
+    return 'ADMIN'; // Firm and Lawyer get admin access by default
+  }
+  return 'CLIENT';
+};
+
 router.post('/signup', async (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName, role: userType = 'CLIENT' } = req.body;
+
+    // Validate userType
+    if (!['FIRM', 'LAWYER', 'CLIENT'].includes(userType)) {
+      return res.status(400).json({ message: 'Invalid role selected' });
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = new User({ email, password, displayName, role: 'CLIENT' });
+    const userRole = getUserRoleByType(userType);
+    const user = new User({
+      email,
+      password,
+      displayName,
+      userType,
+      role: userRole,
+      isProfileComplete: false,
+    });
     await user.save();
 
     const token = generateToken(user._id.toString(), user.email, user.role);
@@ -25,6 +47,8 @@ router.post('/signup', async (req, res) => {
       email: user.email,
       displayName: user.displayName,
       role: user.role,
+      userType: user.userType,
+      isProfileComplete: user.isProfileComplete,
       token,
     });
   } catch (error) {
@@ -34,7 +58,7 @@ router.post('/signup', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role: userType } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -46,6 +70,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // If userType is specified, verify it matches
+    if (userType && user.userType !== userType) {
+      return res.status(401).json({ message: 'Invalid role for this account' });
+    }
+
     const token = generateToken(user._id.toString(), user.email, user.role);
 
     res.json({
@@ -53,6 +82,8 @@ router.post('/login', async (req, res) => {
       email: user.email,
       displayName: user.displayName,
       role: user.role,
+      userType: user.userType,
+      isProfileComplete: user.isProfileComplete,
       token,
     });
   } catch (error) {
@@ -60,16 +91,132 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Complete Firm Profile
+router.post('/complete-firm-profile', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { firmProfile } = req.body;
+
+    if (!firmProfile) {
+      return res.status(400).json({ message: 'Firm profile data is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      {
+        firmProfile,
+        isProfileComplete: true,
+        userType: 'FIRM',
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'Firm profile completed',
+      _id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      isProfileComplete: user.isProfileComplete,
+      userType: user.userType,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to complete firm profile', error });
+  }
+});
+
+// Complete Lawyer Profile
+router.post('/complete-lawyer-profile', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { lawyerProfile } = req.body;
+
+    if (!lawyerProfile) {
+      return res.status(400).json({ message: 'Lawyer profile data is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      {
+        lawyerProfile,
+        isProfileComplete: true,
+        userType: 'LAWYER',
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'Lawyer profile completed',
+      _id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      isProfileComplete: user.isProfileComplete,
+      userType: user.userType,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to complete lawyer profile', error });
+  }
+});
+
+// Complete Client Profile
+router.post('/complete-client-profile', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { clientProfile } = req.body;
+
+    if (!clientProfile) {
+      return res.status(400).json({ message: 'Client profile data is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      {
+        clientProfile,
+        isProfileComplete: true,
+        userType: 'CLIENT',
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'Client profile completed',
+      _id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      isProfileComplete: user.isProfileComplete,
+      userType: user.userType,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to complete client profile', error });
+  }
+});
+
 // Google OAuth routes
 router.get(
   '/google',
-  (req, res, next) => {
+  (req: Request & { session?: any }, res, next) => {
     // Check if Google credentials are configured
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      return res.status(400).json({ 
-        error: 'Google OAuth not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env' 
+      return res.status(400).json({
+        error: 'Google OAuth not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env',
       });
     }
+
+    // Store the role in the session state
+    const { role } = req.query;
+    if (role) {
+      req.session = req.session || {};
+      req.session.selectedRole = role;
+    }
+
     passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
   }
 );
@@ -77,24 +224,24 @@ router.get(
 router.get(
   '/google/callback',
   (req, res, next) => {
-    passport.authenticate('google', { 
-      failureRedirect: 'http://localhost:3000/login?error=oauth_failed',
-      session: false 
+    passport.authenticate('google', {
+      failureRedirect: 'http://localhost:3000/role-selection?error=oauth_failed',
+      session: false,
     })(req, res, next);
   },
   (req: any, res) => {
     try {
       const { user, token } = req.user;
       if (!user || !token) {
-        return res.redirect('http://localhost:3000/login?error=no_user_data');
+        return res.redirect('http://localhost:3000/role-selection?error=no_user_data');
       }
       // Redirect to frontend OAuth callback with token
-      const redirectUrl = `http://localhost:3000/oauth/callback?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(user._id)}`;
+      const redirectUrl = `http://localhost:3000/oauth/callback?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(user._id)}&userType=${encodeURIComponent(user.userType)}`;
       console.log('✅ Google OAuth successful, redirecting to:', redirectUrl);
       res.redirect(redirectUrl);
     } catch (error) {
       console.error('❌ OAuth callback error:', error);
-      res.redirect(`http://localhost:3000/login?error=callback_error`);
+      res.redirect(`http://localhost:3000/role-selection?error=callback_error`);
     }
   }
 );
@@ -108,6 +255,8 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       displayName: user?.displayName,
       photoURL: user?.photoURL,
       role: user?.role,
+      userType: user?.userType,
+      isProfileComplete: user?.isProfileComplete,
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch user', error });
@@ -137,6 +286,8 @@ router.post('/admin/setup-admin', async (req, res) => {
       password,
       displayName,
       role: 'ADMIN',
+      userType: 'FIRM',
+      isProfileComplete: false,
     });
     await admin.save();
 
@@ -148,6 +299,7 @@ router.post('/admin/setup-admin', async (req, res) => {
       email: admin.email,
       displayName: admin.displayName,
       role: admin.role,
+      userType: admin.userType,
       token,
     });
   } catch (error) {
