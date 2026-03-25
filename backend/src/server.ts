@@ -7,6 +7,7 @@ import passport from 'passport';
 import authRoutes from './routes/auth.js';
 import caseRoutes from './routes/cases.js';
 import clientRoutes from './routes/clients.js';
+import taskRoutes from './routes/tasks.js';
 import setupGoogleOAuth from './config/oauth.js';
 
 dotenv.config();
@@ -42,6 +43,7 @@ app.use(passport.session());
 app.use('/api/auth', authRoutes);
 app.use('/api/cases', caseRoutes);
 app.use('/api/clients', clientRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
