@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+google-genai
+pymongo
+python-dotenv
+pydantic
+pydantic-settings
+httpx
+pytest
+rank-bm25

@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: intellilaw-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - intellilaw_mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=intellilaw
+    restart: unless-stopped
+
+volumes:
+  intellilaw_mongo_data:
