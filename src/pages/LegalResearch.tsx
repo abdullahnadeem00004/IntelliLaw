@@ -17,6 +17,7 @@ import {
   Loader2,
   AlertCircle
 } from 'lucide-react';
+import LegalChatbot from '../components/LegalChatbot';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -181,6 +182,18 @@ export default function LegalResearch() {
               Try asking natural language questions like "What are the latest rulings on digital privacy in Pakistan?" for better results.
             </p>
           </div>
+
+          <LegalChatbot
+            className="h-[460px]"
+            initialMessage="Ask me about legal concepts, research strategy, or how to understand a case law result."
+            context="The user is using the AI Legal Research page to research Pakistani law, statutes, precedents, and legal concepts."
+            placeholder="Ask about your research..."
+            suggestions={[
+              'Explain this statute',
+              'Find related case law',
+              'Summarize legal risks',
+            ]}
+          />
         </div>
 
         {/* Results Area */}

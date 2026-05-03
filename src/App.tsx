@@ -68,9 +68,9 @@ export default function App() {
               <Route path="cases/new" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN]}><NewCase /></PrivateRoute>} />
               <Route path="cases/:id" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN]}><CaseDetail /></PrivateRoute>} />
 
-              {/* Legal Analysis - Lawyers, Admin */}
-              <Route path="analysis" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.ADMIN]}><CaseAnalysis /></PrivateRoute>} />
-              <Route path="research" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.ADMIN]}><LegalResearch /></PrivateRoute>} />
+              {/* Legal AI Tools - Lawyers, Clients, Admin */}
+              <Route path="analysis" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.CLIENT, UserRole.ADMIN]}><CaseAnalysis /></PrivateRoute>} />
+              <Route path="research" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.CLIENT, UserRole.ADMIN]}><LegalResearch /></PrivateRoute>} />
 
               {/* Hearings - Lawyers, Staff, Admin */}
               <Route path="hearings" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN]}><Hearings /></PrivateRoute>} />
@@ -105,7 +105,6 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-
 
 
 

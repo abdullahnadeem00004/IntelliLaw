@@ -3,17 +3,14 @@ import {
   Brain, 
   Upload, 
   FileText, 
-  Search, 
   AlertCircle, 
-  CheckCircle2, 
-  TrendingUp, 
   Scale, 
-  MessageSquare,
-  ChevronRight,
   Zap,
   ShieldCheck,
-  Download
+  Download,
+  History
 } from 'lucide-react';
+import LegalChatbot from '../components/LegalChatbot';
 
 export default function CaseAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -155,41 +152,16 @@ export default function CaseAnalysis() {
 
           {/* Right Column: AI Chat & Actions */}
           <div className="space-y-8">
-            {/* AI Assistant Chat */}
-            <div className="card flex flex-col h-[500px]">
-              <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white">
-                  <MessageSquare className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-neutral-900">AI Legal Assistant</h4>
-                  <p className="text-[10px] text-success font-bold uppercase tracking-widest">Online</p>
-                </div>
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                <div className="bg-neutral-100 p-3 rounded-2xl rounded-tl-none text-sm text-neutral-700 max-w-[85%]">
-                  I've analyzed the document. You can ask me specific questions about the legal points or request a draft rebuttal.
-                </div>
-                <div className="bg-primary-600 p-3 rounded-2xl rounded-tr-none text-sm text-white ml-auto max-w-[85%]">
-                  What are the main weaknesses in the respondent's argument?
-                </div>
-                <div className="bg-neutral-100 p-3 rounded-2xl rounded-tl-none text-sm text-neutral-700 max-w-[85%]">
-                  The main weakness is the lack of specific evidence regarding the "National Security" exemption they've claimed under Article 19-A.
-                </div>
-              </div>
-              <div className="p-4 border-t border-neutral-200">
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Ask AI about this case..." 
-                    className="w-full bg-neutral-100 border-none rounded-xl pl-4 pr-12 py-3 text-sm focus:ring-2 focus:ring-primary-500/20 outline-none"
-                  />
-                  <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <LegalChatbot
+              initialMessage="I've analyzed the document. You can ask me about legal points, risks, or next steps."
+              context="The user is reviewing an AI case analysis for a Pakistani legal document. The sample analysis is a writ petition in the Lahore High Court involving Article 19-A of the Constitution of Pakistan."
+              placeholder="Ask AI about this case..."
+              suggestions={[
+                'Explain the key findings',
+                'Summarize the risks',
+                'List next steps',
+              ]}
+            />
 
             {/* Quick Actions */}
             <div className="card p-6 space-y-4">
@@ -215,6 +187,3 @@ export default function CaseAnalysis() {
     </div>
   );
 }
-
-// Adding missing History import
-import { History } from 'lucide-react';

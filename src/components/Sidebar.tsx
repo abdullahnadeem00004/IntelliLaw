@@ -39,8 +39,8 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: Briefcase, label: 'Cases', path: '/cases', allowedRoles: [UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN] },
-  { icon: Brain, label: 'AI Analysis', path: '/analysis', allowedRoles: [UserRole.LAWYER, UserRole.ADMIN] },
-  { icon: BookOpen, label: 'Legal Research', path: '/research', allowedRoles: [UserRole.LAWYER, UserRole.ADMIN] },
+  { icon: Brain, label: 'AI Analysis', path: '/analysis', allowedRoles: [UserRole.LAWYER, UserRole.CLIENT, UserRole.ADMIN] },
+  { icon: BookOpen, label: 'Legal Research', path: '/research', allowedRoles: [UserRole.LAWYER, UserRole.CLIENT, UserRole.ADMIN] },
   { icon: Book, label: 'Knowledge Base', path: '/knowledge-base' },
   { icon: CalendarIcon, label: 'Calendar', path: '/calendar' },
   { icon: Calendar, label: 'Hearings', path: '/hearings', allowedRoles: [UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN] },
@@ -153,4 +153,3 @@ export default function Sidebar() {
     </aside>
   );
 }
-
