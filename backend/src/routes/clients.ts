@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Client from '../models/Client.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
+import { isFirmOrLawyerUser } from '../utils/access.js';
 
 const router = Router();
 
@@ -11,18 +12,14 @@ router.get(
   authMiddleware,
   async (req: AuthRequest, res) => {
     try {
-      const { firmId, search } = req.query;
-      const query: any = {};
-
-      // Lawyers and staff can only see clients they created or clients for their firm
-      if (req.userRole !== 'ADMIN') {
-        query.$or = [
-          { createdByUid: req.userId },
-          { firmId: firmId || 'default-firm' }
-        ];
-      } else if (firmId) {
-        query.firmId = firmId;
+      if (!isFirmOrLawyerUser(req)) {
+        return res.status(403).json({ message: 'Only firms and lawyers can view added clients' });
       }
+
+      const { search } = req.query;
+      const query: any = {
+        createdByUid: req.userId,
+      };
 
       // Search filter
       if (search) {
@@ -54,7 +51,7 @@ router.get(
       }
 
       // Check permissions
-      if (req.userRole !== 'ADMIN' && client.createdByUid !== req.userId) {
+      if (client.createdByUid !== req.userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -85,7 +82,7 @@ router.post(
         type: type || 'Individual',
         address: address || {},
         createdByUid: req.userId,
-        firmId: firmId || 'default-firm',
+        firmId: firmId || req.userId,
       });
 
       await client.save();
@@ -114,7 +111,7 @@ router.put(
       }
 
       // Check permissions
-      if (req.userRole !== 'ADMIN' && client.createdByUid !== req.userId) {
+      if (client.createdByUid !== req.userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -152,7 +149,7 @@ router.delete(
       }
 
       // Check permissions
-      if (req.userRole !== 'ADMIN' && client.createdByUid !== req.userId) {
+      if (client.createdByUid !== req.userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 

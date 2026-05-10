@@ -11,6 +11,7 @@ export interface IInvoice extends Document {
   invoiceNumber: string;
   caseId: string;
   clientId: string;
+  clientUid?: string;
   clientName: string;
   clientEmail?: string;
   amount: number;
@@ -21,6 +22,7 @@ export interface IInvoice extends Document {
   notes?: string;
   amountPaid?: number;
   createdByUid: string;
+  createdByName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +42,7 @@ const invoiceSchema = new Schema<IInvoice>(
     invoiceNumber: { type: String, required: true, unique: true },
     caseId: { type: String, required: true },
     clientId: { type: String, required: true },
+    clientUid: { type: String },
     clientName: { type: String, required: true },
     clientEmail: { type: String },
     amount: { type: Number, required: true },
@@ -54,6 +57,7 @@ const invoiceSchema = new Schema<IInvoice>(
     notes: { type: String },
     amountPaid: { type: Number, default: 0 },
     createdByUid: { type: String, required: true },
+    createdByName: { type: String },
   },
   { timestamps: true }
 );
@@ -61,6 +65,7 @@ const invoiceSchema = new Schema<IInvoice>(
 // Index for faster queries
 invoiceSchema.index({ caseId: 1 });
 invoiceSchema.index({ clientId: 1 });
+invoiceSchema.index({ clientUid: 1 });
 invoiceSchema.index({ status: 1 });
 invoiceSchema.index({ createdByUid: 1 });
 

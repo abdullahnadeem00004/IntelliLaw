@@ -23,6 +23,41 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export interface RegisteredUserProfile extends UserProfile {
+  _id?: string;
+  updatedAt?: string;
+  firmProfile?: {
+    firmName?: string;
+    firmLicense?: string;
+    country?: string;
+    city?: string;
+    address?: string;
+    phoneNumber?: string;
+    website?: string;
+    numberOfLawyers?: number;
+    specialization?: string;
+  };
+  lawyerProfile?: {
+    fullName?: string;
+    licenseNumber?: string;
+    specialization?: string;
+    yearsOfExperience?: number;
+    barCouncil?: string;
+    phoneNumber?: string;
+    address?: string;
+    firmName?: string;
+  };
+  clientProfile?: {
+    fullName?: string;
+    phoneNumber?: string;
+    address?: string;
+    city?: string;
+    cnic?: string;
+    companyName?: string;
+    isIndividual?: boolean;
+  };
+}
+
 export interface Client {
   id: string;
   displayName: string;
@@ -47,14 +82,16 @@ export interface Case {
   title: string;
   court: string;
   judge?: string;
-  status: 'ACTIVE' | 'PENDING' | 'CLOSED' | 'ARCHIVED';
+  status: 'ACTIVE' | 'PENDING' | 'CLOSED' | 'ARCHIVED' | 'ON_HOLD';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   clientName: string;
   clientId?: string;
   clientUid?: string;
+  clientEmail?: string;
   assignedLawyerId?: string;
   assignedLawyerUid?: string;
   assignedLawyerName: string;
+  createdByUid?: string;
   nextHearingDate?: string | Date;
   lastActivityDate?: string | Date;
   createdAt: string | Date;
@@ -115,6 +152,7 @@ export interface Invoice {
   id: string;
   caseId: string;
   clientId: string;
+  clientUid?: string;
   clientName: string;
   amount: number;
   status: 'PAID' | 'UNPAID' | 'OVERDUE' | 'PARTIAL';

@@ -6,6 +6,7 @@ import { UserRole } from '../types';
 interface PrivateRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
+  allowedUserTypes?: Array<'FIRM' | 'LAWYER' | 'CLIENT'>;
 }
 
 /**
@@ -15,7 +16,7 @@ interface PrivateRouteProps {
  * @param children - The component to render if authorized
  * @param allowedRoles - Array of roles allowed to access this route. If empty, any authenticated user is allowed
  */
-export default function PrivateRoute({ children, allowedRoles = [] }: PrivateRouteProps) {
+export default function PrivateRoute({ children, allowedRoles = [], allowedUserTypes = [] }: PrivateRouteProps) {
   const { user, userProfile, loading, isAuthReady } = useAuth();
 
   // Show loading while checking auth
@@ -45,6 +46,15 @@ export default function PrivateRoute({ children, allowedRoles = [] }: PrivateRou
       return <Navigate to="/onboarding/lawyer" replace />;
     } else if (userType === 'CLIENT') {
       return <Navigate to="/onboarding/client" replace />;
+    }
+  }
+
+  if (allowedUserTypes.length > 0) {
+    const userTypeHasAccess = userType && allowedUserTypes.includes(userType);
+
+    if (!userTypeHasAccess) {
+      console.warn(`🚫 PrivateRoute: User type "${userType}" not in allowed user types [${allowedUserTypes.join(', ')}]`);
+      return <Navigate to="/" replace />;
     }
   }
 

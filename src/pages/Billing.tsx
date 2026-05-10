@@ -40,7 +40,7 @@ import html2canvas from 'html2canvas';
 const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444'];
 
 export default function Billing() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [expenseStats, setExpenseStats] = useState<any>(null);
@@ -58,6 +58,7 @@ export default function Billing() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [revenueData, setRevenueData] = useState<any[]>([]);
+  const canManageBilling = userProfile?.userType === 'FIRM';
 
   // Case search states
   const [allCases, setAllCases] = useState<any[]>([]);
@@ -108,22 +109,27 @@ export default function Billing() {
         setInvoices(data);
       }
 
-      // Fetch expenses
-      const expensesResponse = await fetch('http://localhost:5000/api/expenses', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (expensesResponse.ok) {
-        const expensesData = await expensesResponse.json();
-        setExpenses(expensesData);
-      }
+      if (canManageBilling) {
+        // Fetch expenses
+        const expensesResponse = await fetch('http://localhost:5000/api/expenses', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (expensesResponse.ok) {
+          const expensesData = await expensesResponse.json();
+          setExpenses(expensesData);
+        }
 
-      // Fetch expense stats
-      const expenseStatsResponse = await fetch('http://localhost:5000/api/expenses/stats/summary', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (expenseStatsResponse.ok) {
-        const stats = await expenseStatsResponse.json();
-        setExpenseStats(stats);
+        // Fetch expense stats
+        const expenseStatsResponse = await fetch('http://localhost:5000/api/expenses/stats/summary', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (expenseStatsResponse.ok) {
+          const stats = await expenseStatsResponse.json();
+          setExpenseStats(stats);
+        }
+      } else {
+        setExpenses([]);
+        setExpenseStats(null);
       }
 
       // Fetch billing stats
@@ -181,7 +187,7 @@ export default function Billing() {
     if (user) {
       fetchBillingData();
     }
-  }, [user]);
+  }, [user, canManageBilling]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -245,14 +251,25 @@ export default function Billing() {
         setCaseSearchResults(casesData);
       }
 
-      // Fetch all clients
-      const clientsResponse = await fetch('http://localhost:5000/api/clients', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (clientsResponse.ok) {
-        const clientsData = await clientsResponse.json();
-        setAllClients(clientsData);
-        setClientSearchResults(clientsData);
+      // Fetch registered clients and manually added clients
+      const [registeredClientsResponse, addedClientsResponse] = await Promise.all([
+        fetch('http://localhost:5000/api/auth/profiles/clients', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch('http://localhost:5000/api/clients', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      if (registeredClientsResponse.ok && addedClientsResponse.ok) {
+        const registeredClients = await registeredClientsResponse.json();
+        const addedClients = await addedClientsResponse.json();
+        const mergedClients = [
+          ...registeredClients.map((client: any) => ({ ...client, source: 'registered' })),
+          ...addedClients.map((client: any) => ({ ...client, source: 'added' })),
+        ];
+        setAllClients(mergedClients);
+        setClientSearchResults(mergedClients);
       }
     } catch (err) {
       console.error('Error fetching cases and clients:', err);
@@ -285,7 +302,11 @@ export default function Billing() {
     const filtered = allClients.filter(
       (client) =>
         (client.displayName || '').toLowerCase().includes(query.toLowerCase()) ||
-        (client.email || '').toLowerCase().includes(query.toLowerCase())
+        (client.clientProfile?.fullName || '').toLowerCase().includes(query.toLowerCase()) ||
+        (client.email || '').toLowerCase().includes(query.toLowerCase()) ||
+        (client.clientProfile?.phoneNumber || '').toLowerCase().includes(query.toLowerCase()) ||
+        (client.phoneNumber || '').toLowerCase().includes(query.toLowerCase()) ||
+        (client.address?.city || '').toLowerCase().includes(query.toLowerCase())
     );
     setClientSearchResults(filtered);
   };
@@ -295,7 +316,12 @@ export default function Billing() {
     setFormData({
       ...formData,
       caseId: caseItem._id || caseItem.id,
+      clientId: caseItem.clientUid || caseItem.clientId || formData.clientId,
+      clientName: caseItem.clientName || formData.clientName,
     });
+    if (caseItem.clientName) {
+      setClientSearchQuery(caseItem.clientName);
+    }
     setCaseSearchQuery('');
     setShowCaseDropdown(false);
     setCaseSearchResults([]);
@@ -303,10 +329,11 @@ export default function Billing() {
 
   // Handle client selection
   const handleSelectClient = (client: any) => {
+    const profile = client.clientProfile || {};
     setFormData({
       ...formData,
-      clientId: client._id || client.id,
-      clientName: client.displayName,
+      clientId: client.uid || client._id || client.id,
+      clientName: profile.fullName || client.displayName,
     });
     setClientSearchQuery('');
     setShowClientDropdown(false);
@@ -786,38 +813,42 @@ export default function Billing() {
           <p className="text-neutral-500 text-sm mt-1">Manage invoices, track payments, and analyze firm revenue.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={generateFinancialReport}
-            className="btn btn-secondary">
-            <Download className="w-4 h-4 mr-2" />
-            Financial Report
-          </button>
-          <button 
-            onClick={() => {
-              setSelectedExpense(null);
-              setExpenseFormData({
-                title: '',
-                description: '',
-                amount: 0,
-                category: 'OTHER',
-                date: new Date().toISOString().split('T')[0],
-                status: 'PENDING',
-              });
-              setShowExpenseModal(true);
-            }}
-            className="btn btn-secondary">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Expense
-          </button>
-          <button 
-            onClick={() => {
-              setShowCreateModal(true);
-              fetchCasesAndClients();
-            }}
-            className="btn btn-primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Invoice
-          </button>
+          {canManageBilling && (
+            <>
+              <button
+                onClick={generateFinancialReport}
+                className="btn btn-secondary">
+                <Download className="w-4 h-4 mr-2" />
+                Financial Report
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedExpense(null);
+                  setExpenseFormData({
+                    title: '',
+                    description: '',
+                    amount: 0,
+                    category: 'OTHER',
+                    date: new Date().toISOString().split('T')[0],
+                    status: 'PENDING',
+                  });
+                  setShowExpenseModal(true);
+                }}
+                className="btn btn-secondary">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Expense
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreateModal(true);
+                  fetchCasesAndClients();
+                }}
+                className="btn btn-primary">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Invoice
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1035,21 +1066,25 @@ export default function Billing() {
                         title="Download">
                         <Download className="w-4 h-4" />
                       </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedInvoice(inv);
-                          setShowPaymentModal(true);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-                        title="Record Payment">
-                        <CreditCard className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteInvoice(inv._id)}
-                        className="p-2 text-neutral-400 hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                        title="Delete">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canManageBilling && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setShowPaymentModal(true);
+                            }}
+                            className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                            title="Record Payment">
+                            <CreditCard className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteInvoice(inv._id)}
+                            className="p-2 text-neutral-400 hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                            title="Delete">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1067,6 +1102,7 @@ export default function Billing() {
       </div>
 
       {/* Expenses Table */}
+      {canManageBilling && (
       <div className="card overflow-hidden">
         <div className="px-6 py-4 border-b border-neutral-200 flex flex-col md:flex-row items-center justify-between gap-4 bg-neutral-50/50">
           <div>
@@ -1156,9 +1192,10 @@ export default function Billing() {
           </table>
         </div>
       </div>
+      )}
 
       {/* Create Invoice Modal */}
-      {showCreateModal && (
+      {showCreateModal && canManageBilling && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
@@ -1251,21 +1288,29 @@ export default function Billing() {
                       <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
                         {clientSearchResults.length > 0 ? (
                           <>
-                            {clientSearchResults.slice(0, 10).map((client) => (
+                            {clientSearchResults.slice(0, 10).map((client) => {
+                              const profile = client.clientProfile || {};
+                              const name = profile.fullName || client.displayName;
+                              const phone = profile.phoneNumber || client.phoneNumber;
+                              const sourceLabel = client.source === 'added' ? 'Added client' : 'Registered profile';
+
+                              return (
                               <button
-                                key={client._id}
+                                key={`${client.source || 'client'}-${client.uid || client._id}`}
                                 onClick={() => handleSelectClient(client)}
                                 className="w-full text-left px-4 py-2.5 hover:bg-primary-50 transition-colors border-b border-neutral-100 last:border-0"
                               >
-                                <p className="text-sm font-bold text-neutral-900">{client.displayName}</p>
+                                <p className="text-sm font-bold text-neutral-900">{name}</p>
                                 {client.email && (
                                   <p className="text-xs text-neutral-500">{client.email}</p>
                                 )}
-                                {client.phoneNumber && (
-                                  <p className="text-xs text-neutral-400">{client.phoneNumber}</p>
+                                {phone && (
+                                  <p className="text-xs text-neutral-400">{phone}</p>
                                 )}
+                                <p className="text-xs text-neutral-400">{sourceLabel}</p>
                               </button>
-                            ))}
+                              );
+                            })}
                           </>
                         ) : (
                           <div className="p-3 text-center text-sm text-neutral-500">No clients available</div>
@@ -1387,7 +1432,7 @@ export default function Billing() {
       )}
 
       {/* Payment Modal */}
-      {showPaymentModal && selectedInvoice && (
+      {showPaymentModal && selectedInvoice && canManageBilling && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
@@ -1456,7 +1501,7 @@ export default function Billing() {
       )}
 
       {/* Expense Modal */}
-      {showExpenseModal && (
+      {showExpenseModal && canManageBilling && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">

@@ -33,26 +33,30 @@ interface NavItem {
   label: string;
   path: string;
   allowedRoles?: UserRole[];
+  allowedUserTypes?: Array<'FIRM' | 'LAWYER' | 'CLIENT'>;
 }
 
 // Define all navigation items with role-based access
 const allNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: Briefcase, label: 'Cases', path: '/cases', allowedRoles: [UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN] },
+  { icon: Briefcase, label: 'Cases', path: '/cases', allowedUserTypes: ['FIRM', 'LAWYER'] },
+  { icon: Briefcase, label: 'My Cases', path: '/my-cases', allowedUserTypes: ['CLIENT'] },
+  { icon: CreditCard, label: 'My Invoices', path: '/my-invoices', allowedUserTypes: ['CLIENT'] },
   { icon: Brain, label: 'AI Analysis', path: '/analysis', allowedRoles: [UserRole.LAWYER, UserRole.CLIENT, UserRole.ADMIN] },
   { icon: BookOpen, label: 'Legal Research', path: '/research', allowedRoles: [UserRole.LAWYER, UserRole.CLIENT, UserRole.ADMIN] },
   { icon: Book, label: 'Knowledge Base', path: '/knowledge-base' },
   { icon: CalendarIcon, label: 'Calendar', path: '/calendar' },
   { icon: Calendar, label: 'Hearings', path: '/hearings', allowedRoles: [UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN] },
   { icon: MessageSquare, label: 'Messages', path: '/messaging' },
+  { icon: Scale, label: 'Lawyers', path: '/lawyers', allowedUserTypes: ['FIRM'] },
   { icon: Users, label: 'Team', path: '/team', allowedRoles: [UserRole.LAWYER, UserRole.ADMIN] },
   { icon: Building2, label: 'Firm Profile', path: '/firm-profile', allowedRoles: [UserRole.LAWYER, UserRole.ADMIN] },
-  { icon: BarChart3, label: 'Reports', path: '/reports', allowedRoles: [UserRole.ADMIN] },
-  { icon: Users, label: 'User Management', path: '/admin/users', allowedRoles: [UserRole.ADMIN] },
+  { icon: BarChart3, label: 'Reports', path: '/reports', allowedUserTypes: ['FIRM'] },
+  { icon: Users, label: 'User Management', path: '/admin/users', allowedUserTypes: ['FIRM'] },
   { icon: FileText, label: 'Documents', path: '/documents' },
   { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
-  { icon: Users, label: 'Clients', path: '/clients', allowedRoles: [UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN] },
-  { icon: CreditCard, label: 'Billing', path: '/billing', allowedRoles: [UserRole.ADMIN] },
+  { icon: Users, label: 'Clients', path: '/clients', allowedUserTypes: ['FIRM', 'LAWYER'] },
+  { icon: CreditCard, label: 'Billing', path: '/billing', allowedUserTypes: ['FIRM', 'LAWYER'] },
 ];
 
 export default function Sidebar() {
@@ -66,11 +70,14 @@ export default function Sidebar() {
 
   // Filter navigation items based on user role
   const filteredNavItems = allNavItems.filter((item) => {
-    // If no role restrictions, show to all
+    if (item.allowedUserTypes && item.allowedUserTypes.length > 0) {
+      return Boolean(userProfile?.userType && item.allowedUserTypes.includes(userProfile.userType));
+    }
+
     if (!item.allowedRoles || item.allowedRoles.length === 0) {
       return true;
     }
-    // Show if user's role is in allowed roles
+
     return userProfile && item.allowedRoles.includes(userProfile.role);
   });
 
@@ -78,6 +85,16 @@ export default function Sidebar() {
   const getRoleBadge = () => {
     if (!userProfile) return { bg: 'bg-neutral-700', text: 'text-neutral-300', label: 'Unknown' };
     
+    if (userProfile.userType === 'FIRM') {
+      return { bg: 'bg-error/20', text: 'text-error', label: 'Firm' };
+    }
+    if (userProfile.userType === 'LAWYER') {
+      return { bg: 'bg-primary-500/20', text: 'text-primary-400', label: 'Lawyer' };
+    }
+    if (userProfile.userType === 'CLIENT') {
+      return { bg: 'bg-success-500/20', text: 'text-success-400', label: 'Client' };
+    }
+
     const roleBadges: Record<UserRole, { bg: string; text: string; label: string }> = {
       [UserRole.ADMIN]: { bg: 'bg-error/20', text: 'text-error', label: 'Admin' },
       [UserRole.LAWYER]: { bg: 'bg-primary-500/20', text: 'text-primary-400', label: 'Lawyer' },
@@ -120,7 +137,13 @@ export default function Sidebar() {
                 ? "bg-primary-600 text-white" 
                 : "hover:bg-neutral-800 hover:text-neutral-200"
             )}
-            title={item.allowedRoles && item.allowedRoles.length > 0 ? `Available to: ${item.allowedRoles.join(', ')}` : undefined}
+            title={
+              item.allowedUserTypes && item.allowedUserTypes.length > 0
+                ? `Available to: ${item.allowedUserTypes.join(', ')}`
+                : item.allowedRoles && item.allowedRoles.length > 0
+                  ? `Available to: ${item.allowedRoles.join(', ')}`
+                  : undefined
+            }
           >
             <item.icon className={cn(
               "w-5 h-5 transition-colors",

@@ -5,10 +5,14 @@ import PrivateRoute from './components/PrivateRoute';
 import Dashboard from './pages/Dashboard';
 import CaseList from './pages/CaseList';
 import CaseDetail from './pages/CaseDetail';
+import ClientCases from './pages/ClientCases';
+import ClientInvoices from './pages/ClientInvoices';
+import ClientInvoiceDetail from './pages/ClientInvoiceDetail';
 import Hearings from './pages/Hearings';
 import Documents from './pages/Documents';
 import Tasks from './pages/Tasks';
 import Clients from './pages/Clients';
+import Lawyers from './pages/Lawyers';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import NewCase from './pages/NewCase';
@@ -64,9 +68,13 @@ export default function App() {
               <Route index element={<Dashboard />} />
 
               {/* Case Management - Lawyers, Staff, Admin */}
-              <Route path="cases" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN]}><CaseList /></PrivateRoute>} />
-              <Route path="cases/new" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN]}><NewCase /></PrivateRoute>} />
-              <Route path="cases/:id" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN]}><CaseDetail /></PrivateRoute>} />
+              <Route path="cases" element={<PrivateRoute allowedUserTypes={['FIRM', 'LAWYER']}><CaseList /></PrivateRoute>} />
+              <Route path="cases/new" element={<PrivateRoute allowedUserTypes={['FIRM', 'LAWYER']}><NewCase /></PrivateRoute>} />
+              <Route path="cases/:id" element={<PrivateRoute allowedUserTypes={['FIRM', 'LAWYER']}><CaseDetail /></PrivateRoute>} />
+              <Route path="my-cases" element={<PrivateRoute allowedUserTypes={['CLIENT']}><ClientCases /></PrivateRoute>} />
+              <Route path="my-cases/:id" element={<PrivateRoute allowedUserTypes={['CLIENT']}><CaseDetail /></PrivateRoute>} />
+              <Route path="my-invoices" element={<PrivateRoute allowedUserTypes={['CLIENT']}><ClientInvoices /></PrivateRoute>} />
+              <Route path="my-invoices/:id" element={<PrivateRoute allowedUserTypes={['CLIENT']}><ClientInvoiceDetail /></PrivateRoute>} />
 
               {/* Legal AI Tools - Lawyers, Clients, Admin */}
               <Route path="analysis" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.CLIENT, UserRole.ADMIN]}><CaseAnalysis /></PrivateRoute>} />
@@ -89,12 +97,13 @@ export default function App() {
               <Route path="firm-profile" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.ADMIN]}><FirmProfile /></PrivateRoute>} />
 
               {/* Clients - Lawyers, Staff, Admin */}
-              <Route path="clients" element={<PrivateRoute allowedRoles={[UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN]}><Clients /></PrivateRoute>} />
+              <Route path="clients" element={<PrivateRoute allowedUserTypes={['FIRM', 'LAWYER']}><Clients /></PrivateRoute>} />
+              <Route path="lawyers" element={<PrivateRoute allowedUserTypes={['FIRM']}><Lawyers /></PrivateRoute>} />
 
               {/* Admin Only */}
-              <Route path="billing" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><Billing /></PrivateRoute>} />
-              <Route path="reports" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><Reports /></PrivateRoute>} />
-              <Route path="admin/users" element={<PrivateRoute allowedRoles={[UserRole.ADMIN]}><AdminUsers /></PrivateRoute>} />
+              <Route path="billing" element={<PrivateRoute allowedUserTypes={['FIRM', 'LAWYER']}><Billing /></PrivateRoute>} />
+              <Route path="reports" element={<PrivateRoute allowedUserTypes={['FIRM']}><Reports /></PrivateRoute>} />
+              <Route path="admin/users" element={<PrivateRoute allowedUserTypes={['FIRM']}><AdminUsers /></PrivateRoute>} />
             </Route>
 
             {/* Fallback */}
@@ -105,8 +114,6 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-
-
 
 
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Plus, 
   ChevronRight, 
@@ -17,9 +17,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/FirebaseProvider';
-import { UserRole } from '../types';
+import { RegisteredUserProfile, UserRole } from '../types';
 import { PAKISTAN_COURTS, CASE_PRIORITIES } from '../constants';
-import { createCase } from '../services/caseService';
 
 import AddressInput from '../components/forms/AddressInput';
 import PhoneInput from '../components/forms/PhoneInput';
@@ -30,6 +29,8 @@ const steps = [
   { id: 3, label: 'Legal Info', icon: Scale },
   { id: 4, label: 'Review', icon: FileText },
 ];
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export default function NewCase() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -43,11 +44,13 @@ export default function NewCase() {
   const [clientSearchQuery, setClientSearchQuery] = useState('');
   const [clientSearchResults, setClientSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [lawyers, setLawyers] = useState<RegisteredUserProfile[]>([]);
 
   // Check if user has permission to create cases
-  const canCreateCase = userProfile && [UserRole.LAWYER, UserRole.STAFF, UserRole.ADMIN].includes(userProfile.role);
+  const canCreateCase = Boolean(userProfile && ['FIRM', 'LAWYER'].includes(userProfile.userType || ''));
   const canSetJudge = userProfile && [UserRole.LAWYER, UserRole.ADMIN].includes(userProfile.role);
   const canSetOpposingCounsel = userProfile && [UserRole.LAWYER, UserRole.ADMIN].includes(userProfile.role);
+  const isFirm = userProfile?.userType === 'FIRM';
 
   const [formData, setFormData] = useState({
     title: '',
@@ -55,6 +58,7 @@ export default function NewCase() {
     type: 'Civil',
     priority: 'MEDIUM',
     description: '',
+    clientUid: '',
     clientName: '',
     clientType: 'Individual',
     clientEmail: '',
@@ -70,6 +74,8 @@ export default function NewCase() {
     judge: '',
     opposingParty: '',
     opposingCounsel: '',
+    assignedLawyerUid: '',
+    assignedLawyerName: '',
     nextHearingDate: '',
   });
 
@@ -86,6 +92,29 @@ export default function NewCase() {
     setFormData(prev => ({ ...prev, clientPhone: phone }));
   };
 
+  useEffect(() => {
+    if (!isFirm) return;
+
+    const fetchLawyers = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/auth/profiles/lawyers`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          setLawyers(await response.json());
+        }
+      } catch (err) {
+        console.error('Error fetching lawyer profiles:', err);
+      }
+    };
+
+    fetchLawyers();
+  }, [isFirm]);
+
   const searchClients = async (query: string) => {
     if (!query.trim()) {
       setClientSearchResults([]);
@@ -95,18 +124,29 @@ export default function NewCase() {
     setIsSearching(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/clients?search=${encodeURIComponent(query)}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const [registeredResponse, addedResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/auth/profiles/clients?search=${encodeURIComponent(query)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch(`${API_BASE_URL}/clients?search=${encodeURIComponent(query)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
 
-      if (!response.ok) {
+      if (!registeredResponse.ok || !addedResponse.ok) {
         throw new Error('Failed to search clients');
       }
 
-      const data = await response.json();
-      setClientSearchResults(data);
+      const registeredClients = await registeredResponse.json();
+      const addedClients = await addedResponse.json();
+      setClientSearchResults([
+        ...registeredClients.map((client: any) => ({ ...client, source: 'registered' })),
+        ...addedClients.map((client: any) => ({ ...client, source: 'added' })),
+      ]);
     } catch (err) {
       console.error('Error searching clients:', err);
       setClientSearchResults([]);
@@ -116,18 +156,24 @@ export default function NewCase() {
   };
 
   const handleSelectClient = (client: any) => {
+    const profile = client.clientProfile || {};
+    const isAddedClient = client.source === 'added';
+    const isIndividual = isAddedClient ? client.type !== 'Corporate' : profile.isIndividual !== false;
+    const address = client.address || {};
+
     setFormData(prev => ({
       ...prev,
-      clientName: client.displayName,
+      clientUid: client.uid || client._id || '',
+      clientName: profile.fullName || client.displayName,
       clientEmail: client.email || '',
-      clientPhone: client.phoneNumber || '',
-      clientType: client.type || 'Individual',
-      clientAddress: client.address || {
-        province: '',
-        district: '',
-        city: '',
-        area: '',
-        postalCode: '',
+      clientPhone: profile.phoneNumber || client.phoneNumber || '',
+      clientType: isAddedClient ? client.type || 'Individual' : isIndividual ? 'Individual' : 'Corporate',
+      clientAddress: {
+        province: address.province || '',
+        district: address.district || '',
+        city: profile.city || address.city || '',
+        area: address.area || '',
+        postalCode: address.postalCode || '',
       },
     }));
     setShowClientSearch(false);
@@ -172,10 +218,23 @@ export default function NewCase() {
       return;
     }
 
+    if (isFirm && lawyers.length > 0 && !formData.assignedLawyerUid) {
+      setError('Please assign this case to a registered lawyer.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
+      const selectedLawyer = lawyers.find((lawyer) => lawyer.uid === formData.assignedLawyerUid);
+      const assignedLawyerUid = isFirm
+        ? formData.assignedLawyerUid || user.uid
+        : user.uid;
+      const assignedLawyerName = isFirm
+        ? selectedLawyer?.lawyerProfile?.fullName || selectedLawyer?.displayName || user.displayName || user.email || 'Assigned Lawyer'
+        : user.displayName || user.email || 'Assigned Lawyer';
+
       const response = await fetch('http://localhost:5000/api/cases', {
         method: 'POST',
         headers: {
@@ -191,8 +250,11 @@ export default function NewCase() {
           court: formData.court,
           judge: formData.judge || undefined,
           clientName: formData.clientName.trim(),
-          assignedLawyerUid: user.uid,
-          assignedLawyerName: user.displayName || user.email || 'Assigned Lawyer',
+          clientUid: formData.clientUid || undefined,
+          clientId: formData.clientUid || undefined,
+          clientEmail: formData.clientEmail || undefined,
+          assignedLawyerUid,
+          assignedLawyerName,
           nextHearingDate: formData.nextHearingDate || null,
           status: 'ACTIVE',
         }),
@@ -227,7 +289,7 @@ export default function NewCase() {
               </div>
             </div>
             <h1 className="text-2xl font-bold text-neutral-900 mb-2">Access Denied</h1>
-            <p className="text-neutral-500 mb-6">You don't have permission to create cases. Only Lawyers, Staff, and Admins can create new cases.</p>
+            <p className="text-neutral-500 mb-6">You don't have permission to create cases. Only firm and lawyer accounts can create new cases.</p>
             <button 
               onClick={() => navigate('/')}
               className="btn btn-primary"
@@ -431,6 +493,34 @@ export default function NewCase() {
               <AlertCircle className="w-5 h-5 text-info mt-0.5" />
               <p className="text-sm text-info"><span className="font-bold">Required field:</span> Court Name</p>
             </div>
+            {isFirm && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-neutral-500 uppercase">Assigned Lawyer</label>
+                <select
+                  name="assignedLawyerUid"
+                  value={formData.assignedLawyerUid}
+                  onChange={(event) => {
+                    const lawyer = lawyers.find((item) => item.uid === event.target.value);
+                    setFormData((prev) => ({
+                      ...prev,
+                      assignedLawyerUid: event.target.value,
+                      assignedLawyerName: lawyer?.lawyerProfile?.fullName || lawyer?.displayName || '',
+                    }));
+                  }}
+                  className="input-field"
+                >
+                  <option value="">Assign to a registered lawyer</option>
+                  {lawyers.map((lawyer) => (
+                    <option key={lawyer.uid} value={lawyer.uid}>
+                      {lawyer.lawyerProfile?.fullName || lawyer.displayName} - {lawyer.lawyerProfile?.specialization || lawyer.email}
+                    </option>
+                  ))}
+                </select>
+                {lawyers.length === 0 && (
+                  <p className="text-xs text-neutral-500">No registered lawyer profiles are available yet. The case will stay with your firm.</p>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-neutral-500 uppercase">Court Name</label>
@@ -516,6 +606,10 @@ export default function NewCase() {
                   <span className={`badge ${CASE_PRIORITIES.find(p => p.value === formData.priority)?.color}`}>
                     {formData.priority}
                   </span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-neutral-400 uppercase">Assigned Lawyer</p>
+                  <p className="text-base font-bold text-neutral-900">{formData.assignedLawyerName || user?.displayName || 'Firm'}</p>
                 </div>
               </div>
               <div className="p-4 bg-warning/10 border border-warning/20 rounded-xl flex items-center gap-3">
@@ -611,39 +705,46 @@ export default function NewCase() {
 
               {!isSearching && clientSearchResults.length > 0 && (
                 <div className="space-y-2">
-                  {clientSearchResults.map((client) => (
+                  {clientSearchResults.map((client) => {
+                    const profile = client.clientProfile || {};
+                    const name = profile.fullName || client.displayName;
+                    const phone = profile.phoneNumber || client.phoneNumber;
+                    const type = client.source === 'added'
+                      ? client.type || 'Individual'
+                      : profile.isIndividual === false ? 'Corporate' : 'Individual';
+
+                    return (
                     <button
-                      key={client._id}
+                      key={`${client.source || 'client'}-${client.uid || client._id}`}
                       onClick={() => handleSelectClient(client)}
                       className="w-full p-4 text-left border border-neutral-200 rounded-xl hover:border-primary-300 hover:bg-primary-50 transition-all group"
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-sm font-bold text-neutral-900">{client.displayName}</p>
+                          <p className="text-sm font-bold text-neutral-900">{name}</p>
                           <p className="text-xs text-neutral-500 mt-1">
                             {client.email && <span>{client.email}</span>}
-                            {client.email && client.phoneNumber && <span> • </span>}
-                            {client.phoneNumber && <span>{client.phoneNumber}</span>}
+                            {client.email && phone && <span> • </span>}
+                            {phone && <span>{phone}</span>}
                           </p>
-                          {client.type && (
-                            <span className="inline-block mt-2 text-xs px-2 py-1 bg-neutral-100 text-neutral-600 rounded">
-                              {client.type}
-                            </span>
-                          )}
+                          <span className="inline-block mt-2 text-xs px-2 py-1 bg-neutral-100 text-neutral-600 rounded">
+                            {type} - {client.source === 'added' ? 'Added client' : 'Registered profile'}
+                          </span>
                         </div>
                         <span className="text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity text-sm font-bold">
                           Select →
                         </span>
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
               {!isSearching && clientSearchQuery && clientSearchResults.length === 0 && (
                 <div className="text-center py-8">
                   <p className="text-neutral-500">No clients found matching your search.</p>
-                  <p className="text-sm text-neutral-400 mt-2">Try a different search term or create a new client.</p>
+                  <p className="text-sm text-neutral-400 mt-2">Registered profiles and clients added from the Clients page appear here.</p>
                 </div>
               )}
 
@@ -659,4 +760,3 @@ export default function NewCase() {
     </>
   );
 }
-

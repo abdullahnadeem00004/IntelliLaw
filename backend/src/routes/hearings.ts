@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import Hearing from '../models/Hearing.js';
+import Case from '../models/Case.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { buildCaseAccessQuery, canManageCase } from '../utils/access.js';
 
 const router = Router();
 
@@ -11,9 +13,11 @@ router.get(
   async (req: AuthRequest, res) => {
     try {
       const { caseId, status, startDate, endDate, priority } = req.query;
+      const accessibleCases = await Case.find(buildCaseAccessQuery(req)).select('_id').lean();
+      const accessibleCaseIds = accessibleCases.map((caseData) => caseData._id.toString());
       const query: any = {};
 
-      if (caseId) query.caseId = caseId;
+      query.caseId = caseId ? String(caseId) : { $in: accessibleCaseIds };
       if (status) query.status = (status as string).toUpperCase();
       if (priority) query.priority = (priority as string).toUpperCase();
       
@@ -45,6 +49,12 @@ router.get(
       if (!hearing) {
         return res.status(404).json({ message: 'Hearing not found' });
       }
+
+      const caseData = await Case.findById(hearing.caseId);
+      if (!caseData || !canManageCase(caseData, req)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
       res.json(hearing);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch hearing', error });
@@ -66,6 +76,11 @@ router.post(
         });
       }
 
+      const caseData = await Case.findById(caseId);
+      if (!caseData || !canManageCase(caseData, req)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
       const newHearing = new Hearing({
         caseId,
         caseTitle,
@@ -76,7 +91,7 @@ router.post(
         status: status || 'UPCOMING',
         priority: priority || 'MEDIUM',
         notes,
-        createdBy: req.user?.uid || 'unknown',
+        createdBy: req.userId,
       });
 
       await newHearing.save();
@@ -102,6 +117,11 @@ router.put(
       const hearing = await Hearing.findById(req.params.id);
       if (!hearing) {
         return res.status(404).json({ message: 'Hearing not found' });
+      }
+
+      const currentCase = await Case.findById(hearing.caseId);
+      if (!currentCase || !canManageCase(currentCase, req)) {
+        return res.status(403).json({ message: 'Access denied' });
       }
 
       if (caseId) hearing.caseId = caseId;
@@ -132,10 +152,17 @@ router.delete(
   authMiddleware,
   async (req: AuthRequest, res) => {
     try {
-      const hearing = await Hearing.findByIdAndDelete(req.params.id);
+      const hearing = await Hearing.findById(req.params.id);
       if (!hearing) {
         return res.status(404).json({ message: 'Hearing not found' });
       }
+
+      const caseData = await Case.findById(hearing.caseId);
+      if (!caseData || !canManageCase(caseData, req)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await Hearing.findByIdAndDelete(req.params.id);
 
       res.json({ message: 'Hearing deleted successfully' });
     } catch (error) {
@@ -154,13 +181,20 @@ router.get(
   authMiddleware,
   async (req: AuthRequest, res) => {
     try {
-      const total = await Hearing.countDocuments();
-      const upcoming = await Hearing.countDocuments({ status: 'UPCOMING' });
-      const completed = await Hearing.countDocuments({ status: 'COMPLETED' });
-      const cancelled = await Hearing.countDocuments({ status: 'CANCELLED' });
-      const adjourned = await Hearing.countDocuments({ status: 'ADJOURNED' });
+      const accessibleCases = await Case.find(buildCaseAccessQuery(req)).select('_id').lean();
+      const accessibleCaseIds = accessibleCases.map((caseData) => caseData._id.toString());
+      const scopedQuery = { caseId: { $in: accessibleCaseIds } };
+
+      const total = await Hearing.countDocuments(scopedQuery);
+      const upcoming = await Hearing.countDocuments({ ...scopedQuery, status: 'UPCOMING' });
+      const completed = await Hearing.countDocuments({ ...scopedQuery, status: 'COMPLETED' });
+      const cancelled = await Hearing.countDocuments({ ...scopedQuery, status: 'CANCELLED' });
+      const adjourned = await Hearing.countDocuments({ ...scopedQuery, status: 'ADJOURNED' });
 
       const byPriority = await Hearing.aggregate([
+        {
+          $match: scopedQuery,
+        },
         {
           $group: {
             _id: '$priority',
@@ -169,7 +203,7 @@ router.get(
         },
       ]);
 
-      const upcomingHearings = await Hearing.find({ status: 'UPCOMING' })
+      const upcomingHearings = await Hearing.find({ ...scopedQuery, status: 'UPCOMING' })
         .sort({ date: 1 })
         .limit(5);
 

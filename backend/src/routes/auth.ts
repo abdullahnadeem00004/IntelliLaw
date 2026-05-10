@@ -9,11 +9,30 @@ const router = Router();
 
 // Map userType to role
 const getUserRoleByType = (userType: string) => {
-  if (userType === 'FIRM' || userType === 'LAWYER') {
-    return 'ADMIN'; // Firm and Lawyer get admin access by default
+  if (userType === 'FIRM') {
+    return 'ADMIN';
+  }
+  if (userType === 'LAWYER') {
+    return 'LAWYER';
   }
   return 'CLIENT';
 };
+
+const publicUserProfile = (user: any) => ({
+  uid: user._id.toString(),
+  _id: user._id.toString(),
+  email: user.email,
+  displayName: user.displayName,
+  photoURL: user.photoURL,
+  role: user.role,
+  userType: user.userType,
+  isProfileComplete: user.isProfileComplete,
+  firmProfile: user.firmProfile,
+  lawyerProfile: user.lawyerProfile,
+  clientProfile: user.clientProfile,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
 
 router.post('/signup', async (req, res) => {
   try {
@@ -40,7 +59,7 @@ router.post('/signup', async (req, res) => {
     });
     await user.save();
 
-    const token = generateToken(user._id.toString(), user.email, user.role);
+    const token = generateToken(user._id.toString(), user.email, user.role, user.userType);
 
     res.status(201).json({
       _id: user._id,
@@ -75,7 +94,13 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid role for this account' });
     }
 
-    const token = generateToken(user._id.toString(), user.email, user.role);
+    const expectedRole = getUserRoleByType(user.userType);
+    if (user.role !== expectedRole) {
+      user.role = expectedRole as any;
+      await user.save();
+    }
+
+    const token = generateToken(user._id.toString(), user.email, user.role, user.userType);
 
     res.json({
       _id: user._id,
@@ -106,6 +131,7 @@ router.post('/complete-firm-profile', authMiddleware, async (req: AuthRequest, r
         firmProfile,
         isProfileComplete: true,
         userType: 'FIRM',
+        role: 'ADMIN',
       },
       { new: true }
     );
@@ -142,6 +168,7 @@ router.post('/complete-lawyer-profile', authMiddleware, async (req: AuthRequest,
         lawyerProfile,
         isProfileComplete: true,
         userType: 'LAWYER',
+        role: 'LAWYER',
       },
       { new: true }
     );
@@ -178,6 +205,7 @@ router.post('/complete-client-profile', authMiddleware, async (req: AuthRequest,
         clientProfile,
         isProfileComplete: true,
         userType: 'CLIENT',
+        role: 'CLIENT',
       },
       { new: true }
     );
@@ -263,6 +291,65 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Registered lawyer profiles visible to firm accounts.
+router.get('/profiles/lawyers', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.userType ? req.userType !== 'FIRM' : req.userRole !== 'ADMIN') {
+      return res.status(403).json({ message: 'Only firms can view registered lawyer profiles' });
+    }
+
+    const { search } = req.query;
+    const query: any = { userType: 'LAWYER' };
+
+    if (search) {
+      query.$or = [
+        { displayName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { 'lawyerProfile.fullName': { $regex: search, $options: 'i' } },
+        { 'lawyerProfile.specialization': { $regex: search, $options: 'i' } },
+        { 'lawyerProfile.licenseNumber': { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const lawyers = await User.find(query).select('-password').sort({ createdAt: -1 });
+    res.json(lawyers.map(publicUserProfile));
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch lawyer profiles', error });
+  }
+});
+
+// Registered client profiles visible to firms and lawyers.
+router.get('/profiles/clients', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const canViewClients = req.userType
+      ? ['FIRM', 'LAWYER'].includes(req.userType)
+      : ['ADMIN', 'LAWYER'].includes(req.userRole || '');
+
+    if (!canViewClients) {
+      return res.status(403).json({ message: 'Only firms and lawyers can view registered client profiles' });
+    }
+
+    const { search } = req.query;
+    const query: any = { userType: 'CLIENT' };
+
+    if (search) {
+      query.$or = [
+        { displayName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { 'clientProfile.fullName': { $regex: search, $options: 'i' } },
+        { 'clientProfile.phoneNumber': { $regex: search, $options: 'i' } },
+        { 'clientProfile.city': { $regex: search, $options: 'i' } },
+        { 'clientProfile.companyName': { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const clients = await User.find(query).select('-password').sort({ createdAt: -1 });
+    res.json(clients.map(publicUserProfile));
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch client profiles', error });
+  }
+});
+
 // Admin-only endpoint to create admin user or change user roles
 router.post('/admin/setup-admin', async (req, res) => {
   try {
@@ -291,7 +378,7 @@ router.post('/admin/setup-admin', async (req, res) => {
     });
     await admin.save();
 
-    const token = generateToken(admin._id.toString(), admin.email, admin.role);
+    const token = generateToken(admin._id.toString(), admin.email, admin.role, admin.userType);
 
     res.status(201).json({
       message: 'Admin user created successfully',

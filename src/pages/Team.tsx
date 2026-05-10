@@ -37,7 +37,7 @@ export default function Team() {
     
     if (activeTab === 'All') return matchesSearch;
     if (activeTab === 'Lawyers') return matchesSearch && member.role === UserRole.LAWYER;
-    if (activeTab === 'Staff') return matchesSearch && (member.role === UserRole.ASSOCIATE || member.role === UserRole.CLERK);
+    if (activeTab === 'Staff') return matchesSearch && member.role === UserRole.STAFF;
     if (activeTab === 'Admins') return matchesSearch && member.role === UserRole.ADMIN;
     
     return matchesSearch;

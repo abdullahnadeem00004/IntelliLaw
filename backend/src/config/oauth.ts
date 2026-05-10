@@ -19,8 +19,11 @@ export function storeRoleForOAuth(key: string, role: string) {
 }
 
 function getUserRoleByType(userType: string) {
-  if (userType === 'FIRM' || userType === 'LAWYER') {
+  if (userType === 'FIRM') {
     return 'ADMIN';
+  }
+  if (userType === 'LAWYER') {
+    return 'LAWYER';
   }
   return 'CLIENT';
 }
@@ -83,7 +86,7 @@ export function setupGoogleOAuth() {
           }
 
           // Generate JWT token
-          const token = generateToken(user._id.toString(), user.email, user.role);
+          const token = generateToken(user._id.toString(), user.email, user.role, user.userType);
 
           done(null, { user, token });
         } catch (error) {

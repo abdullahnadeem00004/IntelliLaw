@@ -11,7 +11,7 @@ router.get(
   async (req: AuthRequest, res) => {
     try {
       const { status, category, startDate, endDate, search } = req.query;
-      const query: any = {};
+      const query: any = { createdByUid: req.userId };
 
       if (status) query.status = status;
       if (category) query.category = category;
@@ -48,6 +48,11 @@ router.get(
       if (!expense) {
         return res.status(404).json({ message: 'Expense not found' });
       }
+
+      if (expense.createdByUid !== req.userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
       res.json(expense);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch expense', error });
@@ -84,7 +89,7 @@ router.post(
         category: category || 'OTHER',
         date: date ? new Date(date) : new Date(),
         status: status || 'PENDING',
-        createdByUid: req.user?.uid || 'unknown',
+        createdByUid: req.userId,
       });
 
       await newExpense.save();
@@ -109,6 +114,10 @@ router.put(
         return res.status(404).json({ message: 'Expense not found' });
       }
 
+      if (expense.createdByUid !== req.userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
       if (title) expense.title = title;
       if (description !== undefined) expense.description = description;
       if (amount && amount > 0) expense.amount = amount;
@@ -130,10 +139,16 @@ router.delete(
   authMiddleware,
   async (req: AuthRequest, res) => {
     try {
-      const expense = await Expense.findByIdAndDelete(req.params.id);
+      const expense = await Expense.findById(req.params.id);
       if (!expense) {
         return res.status(404).json({ message: 'Expense not found' });
       }
+
+      if (expense.createdByUid !== req.userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await Expense.findByIdAndDelete(req.params.id);
       res.json({ message: 'Expense deleted successfully' });
     } catch (error) {
       res.status(500).json({ message: 'Failed to delete expense', error });
@@ -147,7 +162,7 @@ router.get(
   authMiddleware,
   async (req: AuthRequest, res) => {
     try {
-      const expenses = await Expense.find();
+      const expenses = await Expense.find({ createdByUid: req.userId });
       
       const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
       const pendingExpenses = expenses

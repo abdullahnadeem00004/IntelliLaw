@@ -1,44 +1,54 @@
-import express, { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response } from 'express';
 import Case from '../models/Case.js';
 import Hearing from '../models/Hearing.js';
-import Client from '../models/Client.js';
 import Task from '../models/Task.js';
 import Document from '../models/Document.js';
 import Expense from '../models/Expense.js';
 import Invoice from '../models/Invoice.js';
+import User from '../models/User.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { buildCaseAccessQuery, mergeQueries } from '../utils/access.js';
 
 const router = Router();
 
 // Dashboard Statistics - Admin View (GET /api/dashboard/stats)
 router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
+    const caseAccessQuery = buildCaseAccessQuery(req);
+    const accessibleCases = await Case.find(caseAccessQuery).select('_id').lean();
+    const accessibleCaseIds = accessibleCases.map((caseData) => caseData._id.toString());
 
-    // Get active cases count (all active/pending cases regardless of assignment)
-    const activeCases = await Case.countDocuments({
+    const activeCases = await Case.countDocuments(mergeQueries(caseAccessQuery, {
       status: { $in: ['ACTIVE', 'PENDING'] },
-    });
+    }));
 
-    // Get upcoming hearings count
     const upcomingHearings = await Hearing.countDocuments({
+      caseId: { $in: accessibleCaseIds },
       status: 'UPCOMING',
       date: { $gte: new Date() },
     });
 
-    // Get total clients count
-    const totalClients = await Client.countDocuments();
+    const totalClients = await User.countDocuments({ userType: 'CLIENT' });
 
-    // Get pending tasks count
     const pendingTasks = await Task.countDocuments({
+      $or: [
+        { createdByUid: userId },
+        { assignedTo: userId },
+      ],
       status: { $in: ['TODO', 'IN_PROGRESS'] },
     });
 
-    // Get revenue (total invoiced amount)
     const invoices = await Invoice.aggregate([
       {
         $match: {
-          status: { $in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
+          $or: [
+            { createdByUid: userId },
+            { clientUid: userId },
+            { clientId: userId },
+            { caseId: { $in: accessibleCaseIds } },
+          ],
+          status: { $in: ['UNPAID', 'PARTIAL', 'OVERDUE'] },
         },
       },
       {
@@ -51,8 +61,12 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => 
 
     const totalRevenue = invoices[0]?.total || 0;
 
-    // Get total expenses
     const expenses = await Expense.aggregate([
+      {
+        $match: {
+          createdByUid: userId,
+        },
+      },
       {
         $group: {
           _id: null,
@@ -63,8 +77,8 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => 
 
     const totalExpenses = expenses[0]?.total || 0;
 
-    // Get recent documents count
     const recentDocuments = await Document.countDocuments({
+      caseId: { $in: accessibleCaseIds },
       createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, // Last 7 days
     });
 
@@ -89,7 +103,11 @@ router.get('/upcoming-hearings', authMiddleware, async (req: AuthRequest, res: R
   try {
     const limit = parseInt(req.query.limit as string) || 5;
 
+    const accessibleCases = await Case.find(buildCaseAccessQuery(req)).select('_id').lean();
+    const accessibleCaseIds = accessibleCases.map((caseData) => caseData._id.toString());
+
     const hearings = await Hearing.find({
+      caseId: { $in: accessibleCaseIds },
       status: 'UPCOMING',
       date: { $gte: new Date() },
     })
@@ -107,11 +125,12 @@ router.get('/upcoming-hearings', authMiddleware, async (req: AuthRequest, res: R
 // Get recent activities
 router.get('/recent-activities', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 10;
+    const accessibleCases = await Case.find(buildCaseAccessQuery(req)).select('_id').lean();
+    const accessibleCaseIds = accessibleCases.map((caseData) => caseData._id.toString());
 
     // Fetch recent documents
-    const recentDocs = await Document.find({ firmId: req.user?.firmId })
+    const recentDocs = await Document.find({ caseId: { $in: accessibleCaseIds } })
       .sort({ createdAt: -1 })
       .limit(5)
       .lean();
@@ -119,7 +138,7 @@ router.get('/recent-activities', authMiddleware, async (req: AuthRequest, res: R
     // Fetch completed tasks
     const completedTasks = await Task.find({
       status: 'COMPLETED',
-      assignedTo: userId,
+      assignedTo: req.userId,
     })
       .sort({ updatedAt: -1 })
       .limit(5)
@@ -127,7 +146,7 @@ router.get('/recent-activities', authMiddleware, async (req: AuthRequest, res: R
 
     // Fetch recent hearing updates
     const recentHearings = await Hearing.find({
-      createdBy: userId,
+      caseId: { $in: accessibleCaseIds },
       status: { $in: ['COMPLETED', 'ADJOURNED'] },
     })
       .sort({ date: -1 })
@@ -175,16 +194,11 @@ router.get('/recent-activities', authMiddleware, async (req: AuthRequest, res: R
 // Get my cases for lawyer dashboard
 router.get('/my-cases', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 5;
 
-    const cases = await Case.find({
-      $or: [
-        { assignedLawyerId: userId },
-        { createdBy: userId },
-      ],
+    const cases = await Case.find(mergeQueries(buildCaseAccessQuery(req), {
       status: { $in: ['ACTIVE', 'PENDING'] },
-    })
+    }))
       .sort({ lastActivityDate: -1 })
       .limit(limit)
       .lean();
@@ -199,7 +213,7 @@ router.get('/my-cases', authMiddleware, async (req: AuthRequest, res: Response) 
 // Get my tasks for lawyer/staff dashboard
 router.get('/my-tasks', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
     const limit = parseInt(req.query.limit as string) || 5;
 
     const tasks = await Task.find({
@@ -220,21 +234,27 @@ router.get('/my-tasks', authMiddleware, async (req: AuthRequest, res: Response) 
 // Get dashboard summary for client
 router.get('/client-summary', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.userId;
 
-    // Get cases for this client
-    const clientCases = await Case.find({ clientUid: userId })
+    const clientCases = await Case.find(buildCaseAccessQuery(req))
       .sort({ createdAt: -1 })
       .lean();
 
-    // Get invoices for client
-    const invoices = await Invoice.find({ clientId: userId, status: { $in: ['ISSUED', 'OVERDUE'] } })
+    const clientCaseIds = clientCases.map((caseData) => caseData._id.toString());
+
+    const invoices = await Invoice.find({
+      $or: [
+        { clientUid: userId },
+        { clientId: userId },
+        { caseId: { $in: clientCaseIds } },
+      ],
+      status: { $in: ['UNPAID', 'PARTIAL', 'OVERDUE'] },
+    })
       .sort({ dueDate: 1 })
       .lean();
 
-    // Get upcoming hearings
     const upcomingHearings = await Hearing.find({
-      caseId: { $in: clientCases.map((c) => c._id) },
+      caseId: { $in: clientCaseIds },
       status: 'UPCOMING',
       date: { $gte: new Date() },
     })

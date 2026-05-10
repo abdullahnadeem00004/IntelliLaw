@@ -1,0 +1,250 @@
+IntelliLaw MongoDB Schema
+=========================
+
+The backend uses Mongoose models from backend/src/models.
+Default MongoDB URI:
+mongodb://localhost:27017/intellilaw
+
+Mongoose automatically adds _id to each document. Schemas using timestamps also
+get createdAt and updatedAt. Mongoose may also store __v by default.
+
+
+Collection: users
+-----------------
+Model file: backend/src/models/User.ts
+
+Fields:
+- email: String, required, unique, lowercase, trim
+- password: String, required, bcrypt-hashed before save
+- displayName: String, required
+- photoURL: String, optional
+- googleId: String, optional
+- role: String enum ADMIN | LAWYER | CLIENT | STAFF, default CLIENT
+- userType: String enum FIRM | LAWYER | CLIENT, default CLIENT
+- isProfileComplete: Boolean, default false
+- firmProfile: Object, optional
+  - firmName: String
+  - firmLicense: String
+  - country: String
+  - city: String
+  - address: String
+  - phoneNumber: String
+  - website: String
+  - numberOfLawyers: Number
+  - specialization: String
+- lawyerProfile: Object, optional
+  - fullName: String
+  - licenseNumber: String
+  - specialization: String
+  - yearsOfExperience: Number
+  - barCouncil: String
+  - phoneNumber: String
+  - address: String
+  - firmName: String
+- clientProfile: Object, optional
+  - fullName: String
+  - phoneNumber: String
+  - address: String
+  - city: String
+  - cnic: String
+  - companyName: String
+  - isIndividual: Boolean
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+
+Collection: cases
+-----------------
+Model file: backend/src/models/Case.ts
+
+Fields:
+- title: String, required
+- caseNumber: String, required, unique
+- category: String, required
+- priority: String enum LOW | MEDIUM | HIGH | CRITICAL, default MEDIUM
+- description: String, default empty string
+- court: String, required
+- judge: String, optional
+- status: String enum ACTIVE | CLOSED | PENDING | ON_HOLD, default ACTIVE
+- clientName: String, required
+- clientId: String, optional
+- assignedLawyerUid: String, required
+- assignedLawyerName: String, required
+- nextHearingDate: Date, optional
+- lastActivityDate: Date, default Date.now
+- tags: String[]
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+
+Collection: clients
+-------------------
+Model file: backend/src/models/Client.ts
+
+Fields:
+- displayName: String, required
+- email: String, optional
+- phoneNumber: String, optional
+- type: String enum Individual | Corporate | Organization, default Individual
+- address: Object, optional
+  - province: String
+  - district: String
+  - city: String
+  - area: String
+  - postalCode: String
+- createdByUid: String, required
+- firmId: String, default default-firm
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+
+Collection: documents
+---------------------
+Model file: backend/src/models/Document.ts
+
+Fields:
+- documentNumber: String, required, unique, indexed
+- name: String, required, trim
+- description: String, optional
+- caseId: String, required, indexed
+- category: String enum PLEADINGS | EVIDENCE | ORDERS | CORRESPONDENCE | OTHER, default OTHER, indexed
+- fileUrl: String, required
+- fileName: String, required
+- fileSize: Number, required
+- fileType: String, required
+- uploadedBy: String, required, indexed
+- uploadedAt: Date, default Date.now, indexed
+- tags: String[]
+- isVerified: Boolean, default true
+- confidentiality: String enum PUBLIC | RESTRICTED | CONFIDENTIAL, default CONFIDENTIAL
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+Indexes:
+- documentNumber: 1
+- caseId: 1
+- category: 1
+- uploadedBy: 1
+- uploadedAt: 1
+- caseId: 1, category: 1
+- uploadedAt: -1
+- text index on name, description, tags
+
+
+Collection: hearings
+--------------------
+Model file: backend/src/models/Hearing.ts
+Explicit collection name: hearings
+
+Fields:
+- caseId: String, required, indexed
+- caseTitle: String, required
+- date: Date, required, indexed
+- time: String, required
+- court: String, required
+- purpose: String, required
+- status: String enum UPCOMING | COMPLETED | ADJOURNED | CANCELLED, default UPCOMING, indexed
+- priority: String enum LOW | MEDIUM | HIGH, default MEDIUM
+- notes: String, optional
+- createdBy: String, required
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+Indexes:
+- caseId: 1
+- date: 1
+- status: 1
+- caseId: 1, date: 1
+- status: 1, date: 1
+- createdBy: 1, date: 1
+
+
+Collection: tasks
+-----------------
+Model file: backend/src/models/Task.ts
+
+Fields:
+- title: String, required
+- description: String, optional
+- caseId: String, optional
+- dueDate: Date, required
+- priority: String enum LOW | MEDIUM | HIGH, default MEDIUM
+- status: String enum TODO | IN_PROGRESS | COMPLETED, default TODO
+- assignedTo: String, required
+- assignedToName: String, optional
+- createdByUid: String, required
+- completedAt: Date, optional
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+
+Collection: invoices
+--------------------
+Model file: backend/src/models/Invoice.ts
+
+Fields:
+- invoiceNumber: String, required, unique
+- caseId: String, required, indexed
+- clientId: String, required, indexed
+- clientName: String, required
+- clientEmail: String, optional
+- amount: Number, required
+- status: String enum PAID | UNPAID | OVERDUE | PARTIAL, default UNPAID, indexed
+- dueDate: Date, required
+- issuedDate: Date, default Date.now
+- items: Array of invoice item objects
+  - description: String, required
+  - quantity: Number, required, default 1
+  - unitPrice: Number, required
+  - amount: Number, required
+- notes: String, optional
+- amountPaid: Number, default 0
+- createdByUid: String, required, indexed
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+Indexes:
+- caseId: 1
+- clientId: 1
+- status: 1
+- createdByUid: 1
+
+
+Collection: expenses
+--------------------
+Model file: backend/src/models/Expense.ts
+
+Fields:
+- expenseNumber: String, required, unique
+- title: String, required
+- description: String, optional
+- amount: Number, required
+- category: String enum TRAVEL | OFFICE | UTILITIES | STAFF | LEGAL | OTHER, default OTHER, indexed
+- date: Date, default Date.now, indexed
+- status: String enum PENDING | APPROVED | PAID, default PENDING, indexed
+- createdByUid: String, required, indexed
+- approvedByUid: String, optional
+
+Timestamps:
+- createdAt: Date
+- updatedAt: Date
+
+Indexes:
+- date: 1
+- category: 1
+- status: 1
+- createdByUid: 1

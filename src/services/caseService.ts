@@ -13,6 +13,8 @@ export interface CreateCaseInput {
   court: string;
   judge?: string;
   clientName: string;
+  clientUid?: string;
+  clientEmail?: string;
   assignedLawyerUid: string;
   assignedLawyerName: string;
   nextHearingDate?: string | null;
@@ -37,7 +39,9 @@ export async function createCase(input: CreateCaseInput) {
     judge: input.judge || '',
     status: 'ACTIVE',
     clientName: input.clientName,
-    clientId: '',
+    clientId: input.clientUid || '',
+    clientUid: input.clientUid,
+    clientEmail: input.clientEmail,
     assignedLawyerUid: input.assignedLawyerUid,
     assignedLawyerName: input.assignedLawyerName,
     nextHearingDate: input.nextHearingDate || null,
@@ -70,6 +74,8 @@ export async function subscribeCases(onData: (cases: Case[]) => void, onError?: 
       status: item.status,
       clientName: item.clientName,
       clientId: item.clientId,
+      clientUid: item.clientUid,
+      clientEmail: item.clientEmail,
       assignedLawyerUid: item.assignedLawyerUid,
       assignedLawyerName: item.assignedLawyerName,
       nextHearingDate: item.nextHearingDate,
@@ -111,6 +117,8 @@ export async function subscribeCasesByFilter(
       status: item.status,
       clientName: item.clientName,
       clientId: item.clientId,
+      clientUid: item.clientUid,
+      clientEmail: item.clientEmail,
       assignedLawyerUid: item.assignedLawyerUid,
       assignedLawyerName: item.assignedLawyerName,
       nextHearingDate: item.nextHearingDate,
@@ -146,6 +154,8 @@ export async function subscribeCaseById(
       status: response.data.status,
       clientName: response.data.clientName,
       clientId: response.data.clientId,
+      clientUid: response.data.clientUid,
+      clientEmail: response.data.clientEmail,
       assignedLawyerUid: response.data.assignedLawyerUid,
       assignedLawyerName: response.data.assignedLawyerName,
       nextHearingDate: response.data.nextHearingDate,

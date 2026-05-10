@@ -34,10 +34,28 @@ const tabs = [
   { id: 'billing', label: 'Billing', icon: CreditCard },
 ];
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+function getInvoiceStatus(invoice: any) {
+  if (invoice.status === 'PAID') return 'PAID';
+  const dueDate = new Date(invoice.dueDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+  return dueDate < today ? 'OVERDUE' : invoice.status;
+}
+
+function getInvoiceStatusClass(status: string) {
+  if (status === 'PAID') return 'bg-success/10 text-success';
+  if (status === 'OVERDUE') return 'bg-error/10 text-error';
+  if (status === 'PARTIAL') return 'bg-warning/10 text-warning';
+  return 'bg-neutral-100 text-neutral-600';
+}
+
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,12 +63,19 @@ export default function CaseDetail() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [relatedTasks, setRelatedTasks] = useState<any[]>([]);
   const [caseHistory, setCaseHistory] = useState<any[]>([]);
+  const [caseInvoices, setCaseInvoices] = useState<any[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const isClientView = userProfile?.userType === 'CLIENT';
+  const visibleTabs = isClientView
+    ? tabs.filter((tab) => ['overview', 'history', 'billing'].includes(tab.id))
+    : tabs;
 
   const fetchRelatedTasks = async (caseId: string) => {
+    if (isClientView) return;
+
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/tasks?caseId=${caseId}`, {
+      const response = await fetch(`${API_BASE_URL}/tasks?caseId=${caseId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -62,6 +87,23 @@ export default function CaseDetail() {
       }
     } catch (err) {
       console.error('Error fetching tasks:', err);
+    }
+  };
+
+  const fetchCaseInvoices = async (caseId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/billing?caseId=${caseId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setCaseInvoices(await response.json());
+      }
+    } catch (err) {
+      console.error('Error fetching case invoices:', err);
     }
   };
 
@@ -115,7 +157,7 @@ export default function CaseDetail() {
     const fetchCaseData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/cases/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/cases/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -138,8 +180,11 @@ export default function CaseDetail() {
           status: data.status,
           clientName: data.clientName,
           clientId: data.clientId,
+          clientUid: data.clientUid,
+          clientEmail: data.clientEmail,
           assignedLawyerUid: data.assignedLawyerUid,
           assignedLawyerName: data.assignedLawyerName,
+          createdByUid: data.createdByUid,
           nextHearingDate: data.nextHearingDate,
           lastActivityDate: data.lastActivityDate,
           tags: data.tags || [],
@@ -147,8 +192,10 @@ export default function CaseDetail() {
           updatedAt: data.updatedAt,
         });
 
-        // Fetch related tasks
-        await fetchRelatedTasks(id);
+        await Promise.all([
+          fetchRelatedTasks(id),
+          fetchCaseInvoices(id),
+        ]);
 
         // Generate mock case history
         setCaseHistory([
@@ -163,7 +210,7 @@ export default function CaseDetail() {
     };
 
     fetchCaseData();
-  }, [id]);
+  }, [id, isClientView]);
 
   if (loading) {
     return (
@@ -182,7 +229,7 @@ export default function CaseDetail() {
         </div>
         <h2 className="text-xl font-bold text-neutral-900">Case Not Found</h2>
         <p className="text-neutral-500">The case you are looking for does not exist or has been removed.</p>
-        <button onClick={() => navigate('/cases')} className="btn btn-primary">
+        <button onClick={() => navigate(isClientView ? '/my-cases' : '/cases')} className="btn btn-primary">
           Back to Cases
         </button>
       </div>
@@ -203,7 +250,7 @@ export default function CaseDetail() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => navigate('/cases')}
+            onClick={() => navigate(isClientView ? '/my-cases' : '/cases')}
             className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-neutral-500" />
@@ -232,6 +279,7 @@ export default function CaseDetail() {
             </p>
           </div>
         </div>
+        {!isClientView && (
         <div className="flex items-center gap-3">
           <button className="btn btn-secondary">
             <Share2 className="w-4 h-4 mr-2" />
@@ -270,11 +318,12 @@ export default function CaseDetail() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-neutral-200">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -399,6 +448,7 @@ export default function CaseDetail() {
               </div>
 
               {/* Recent Documents */}
+              {!isClientView && (
               <div className="card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-bold text-neutral-900">Recent Documents</h3>
@@ -426,6 +476,7 @@ export default function CaseDetail() {
                   ))}
                 </div>
               </div>
+              )}
             </>
           )}
 
@@ -525,37 +576,48 @@ export default function CaseDetail() {
 
           {activeTab === 'billing' && (
             <div className="card p-6">
-              <h3 className="text-lg font-bold text-neutral-900 mb-6">Billing Summary</h3>
+              <h3 className="text-lg font-bold text-neutral-900 mb-6">Invoices</h3>
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-xs font-bold text-neutral-500 uppercase">Total Hours</p>
-                    <p className="text-2xl font-bold text-neutral-900 mt-2">24.5</p>
+                    <p className="text-xs font-bold text-neutral-500 uppercase">Total Invoiced</p>
+                    <p className="text-2xl font-bold text-neutral-900 mt-2">
+                      PKR {caseInvoices.reduce((sum, invoice) => sum + invoice.amount, 0).toLocaleString()}
+                    </p>
                   </div>
                   <div className="p-4 bg-neutral-50 rounded-xl">
-                    <p className="text-xs font-bold text-neutral-500 uppercase">Total Costs</p>
-                    <p className="text-2xl font-bold text-neutral-900 mt-2">PKR 147,000</p>
+                    <p className="text-xs font-bold text-neutral-500 uppercase">Outstanding</p>
+                    <p className="text-2xl font-bold text-neutral-900 mt-2">
+                      PKR {caseInvoices.reduce((sum, invoice) => sum + (invoice.amount - (invoice.amountPaid || 0)), 0).toLocaleString()}
+                    </p>
                   </div>
                 </div>
                 <div className="border-t border-neutral-200 pt-6">
-                  <h4 className="font-bold text-neutral-900 mb-4">Recent Entries</h4>
+                  <h4 className="font-bold text-neutral-900 mb-4">Issued Invoices</h4>
                   <div className="space-y-3">
-                    {[
-                      { date: 'Mar 15, 2024', description: 'Court hearing preparation', hours: 3.5, rate: 5000 },
-                      { date: 'Mar 12, 2024', description: 'Document review', hours: 2.0, rate: 5000 },
-                      { date: 'Mar 10, 2024', description: 'Client consultation', hours: 1.5, rate: 5000 },
-                    ].map((entry, i) => (
-                      <div key={i} className="flex justify-between py-2 border-b border-neutral-100 last:border-0">
+                    {caseInvoices.length > 0 ? (
+                      caseInvoices.map((invoice) => {
+                        const invoiceStatus = getInvoiceStatus(invoice);
+                        return (
+                      <button
+                        key={invoice._id}
+                        onClick={() => isClientView ? navigate(`/my-invoices/${invoice._id}`) : navigate('/billing')}
+                        className="w-full flex justify-between py-3 border-b border-neutral-100 last:border-0 text-left hover:bg-neutral-50 rounded-lg px-2 transition-colors"
+                      >
                         <div>
-                          <p className="text-sm font-medium text-neutral-900">{entry.description}</p>
-                          <p className="text-xs text-neutral-500">{entry.date}</p>
+                          <p className="text-sm font-bold text-neutral-900">{invoice.invoiceNumber}</p>
+                          <p className="text-xs text-neutral-500">Due {new Date(invoice.dueDate).toLocaleDateString()}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-neutral-900">{entry.hours}h</p>
-                          <p className="text-xs text-neutral-500">PKR {entry.hours * entry.rate}</p>
+                          <p className="text-sm font-bold text-neutral-900">PKR {invoice.amount.toLocaleString()}</p>
+                          <span className={`badge mt-1 ${getInvoiceStatusClass(invoiceStatus)}`}>{invoiceStatus}</span>
                         </div>
-                      </div>
-                    ))}
+                      </button>
+                        );
+                      })
+                    ) : (
+                      <p className="text-neutral-500 text-center py-8">No invoices have been issued for this case yet.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -587,9 +649,11 @@ export default function CaseDetail() {
                 <span className="text-neutral-700">Assigned: {caseData.assignedLawyerName || 'Unassigned'}</span>
               </div>
             </div>
-            <button className="btn btn-secondary w-full mt-6">
-              View Full Profile
-            </button>
+            {!isClientView && (
+              <button className="btn btn-secondary w-full mt-6">
+                View Full Profile
+              </button>
+            )}
           </div>
 
           {/* Upcoming Hearing Widget */}
@@ -622,9 +686,11 @@ export default function CaseDetail() {
               ) : (
                 <p className="text-sm text-neutral-500 italic">No hearing scheduled yet.</p>
               )}
-              <button className="btn btn-primary w-full">
-                Prepare Hearing Brief
-              </button>
+              {!isClientView && (
+                <button className="btn btn-primary w-full">
+                  Prepare Hearing Brief
+                </button>
+              )}
             </div>
           </div>
 
@@ -632,11 +698,14 @@ export default function CaseDetail() {
           <div className="card p-6">
             <h3 className="text-lg font-bold text-neutral-900 mb-6">Assigned Team</h3>
             <div className="space-y-4">
-              {[
-                { name: caseData.assignedLawyerName || 'Unassigned', role: 'Lead Counsel', initial: (caseData.assignedLawyerName || 'U').charAt(0) },
-                { name: 'Sarah Khan', role: 'Associate', initial: 'S' },
-                { name: 'Zaid Malik', role: 'Clerk', initial: 'Z' },
-              ].map((member, i) => (
+              {(isClientView
+                ? [{ name: caseData.assignedLawyerName || 'Unassigned', role: 'Lead Counsel', initial: (caseData.assignedLawyerName || 'U').charAt(0) }]
+                : [
+                    { name: caseData.assignedLawyerName || 'Unassigned', role: 'Lead Counsel', initial: (caseData.assignedLawyerName || 'U').charAt(0) },
+                    { name: 'Sarah Khan', role: 'Associate', initial: 'S' },
+                    { name: 'Zaid Malik', role: 'Clerk', initial: 'Z' },
+                  ]
+              ).map((member, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-xs font-bold text-neutral-600">
                     {member.initial}
@@ -648,9 +717,11 @@ export default function CaseDetail() {
                 </div>
               ))}
             </div>
-            <button className="btn btn-ghost w-full mt-6 text-xs">
-              Manage Team
-            </button>
+            {!isClientView && (
+              <button className="btn btn-ghost w-full mt-6 text-xs">
+                Manage Team
+              </button>
+            )}
           </div>
         </div>
       </div>

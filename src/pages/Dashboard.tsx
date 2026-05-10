@@ -178,17 +178,24 @@ export default function Dashboard() {
   }
 
   const renderDashboard = () => {
-    switch (userProfile?.role) {
-      case UserRole.ADMIN:
+    switch (userProfile?.userType) {
+      case 'FIRM':
         return <AdminDashboard stats={{ activeCasesCount, upcomingHearingsCount, clientsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} activities={activities} />;
-      case UserRole.LAWYER:
+      case 'LAWYER':
         return <LawyerDashboard stats={{ activeCasesCount, upcomingHearingsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} activities={activities} myTasks={myTasks} />;
-      case UserRole.STAFF:
-        return <StaffDashboard role={userProfile.role} stats={{ pendingTasksCount }} upcomingHearings={upcomingHearings} myTasks={myTasks} activities={activities} />;
-      case UserRole.CLIENT:
+      case 'CLIENT':
         return <ClientDashboard />;
       default:
-        return <LawyerDashboard stats={{ activeCasesCount, upcomingHearingsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} activities={activities} myTasks={myTasks} />;
+        if (userProfile?.role === UserRole.STAFF) {
+          return <StaffDashboard role={userProfile.role} stats={{ pendingTasksCount }} upcomingHearings={upcomingHearings} myTasks={myTasks} activities={activities} />;
+        }
+        if (userProfile?.role === UserRole.CLIENT) {
+          return <ClientDashboard />;
+        }
+        if (userProfile?.role === UserRole.ADMIN) {
+          return <AdminDashboard stats={{ activeCasesCount, upcomingHearingsCount, clientsCount, pendingTasksCount }} upcomingHearings={upcomingHearings} activities={activities} />;
+        }
+        return <StaffDashboard role={userProfile.role} stats={{ pendingTasksCount }} upcomingHearings={upcomingHearings} myTasks={myTasks} activities={activities} />;
     }
   };
 
@@ -198,15 +205,15 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-neutral-900">
-            {userProfile?.role === UserRole.CLIENT ? 'Welcome back,' : 'Assalam-o-Alaikum,'} {userProfile?.displayName || 'User'}
+            {userProfile?.userType === 'CLIENT' ? 'Welcome back,' : 'Assalam-o-Alaikum,'} {userProfile?.displayName || 'User'}
           </h1>
           <p className="text-neutral-500 mt-1">
-            {userProfile?.role === UserRole.CLIENT 
+            {userProfile?.userType === 'CLIENT'
               ? "Here's the latest update on your legal matters." 
               : "Here's what's happening with your cases today."}
           </p>
         </div>
-        {userProfile?.role !== UserRole.CLIENT && (
+        {userProfile?.userType !== 'CLIENT' && (
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/calendar')}
@@ -341,54 +348,132 @@ function StaffDashboard({ role, stats, upcomingHearings, myTasks = [], activitie
 }
 
 function ClientDashboard() {
+  const navigate = useNavigate();
+  const [summary, setSummary] = useState<any>({ cases: [], invoices: [], upcomingHearings: [] });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/api/dashboard/client-summary', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.ok) {
+          setSummary(await response.json());
+        }
+      } catch (error) {
+        console.error('Error fetching client summary:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSummary();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+      </div>
+    );
+  }
+
+  const primaryCase = summary.cases?.[0];
+  const activeCases = summary.cases?.filter((caseItem: any) => ['ACTIVE', 'PENDING', 'ON_HOLD'].includes(caseItem.status)) || [];
+  const invoices = summary.invoices || [];
+  const outstanding = invoices.reduce((sum: number, invoice: any) => sum + (invoice.amount - (invoice.amountPaid || 0)), 0);
+  const progressByStatus: Record<string, number> = {
+    ACTIVE: 60,
+    PENDING: 35,
+    ON_HOLD: 45,
+    CLOSED: 100,
+    ARCHIVED: 100,
+  };
+  const progress = primaryCase ? progressByStatus[primaryCase.status] || 25 : 0;
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card p-6 bg-primary-900 text-white">
+        <div onClick={() => navigate('/my-cases')} className="card p-6 bg-primary-900 text-white cursor-pointer hover:shadow-lg transition-all">
           <h3 className="text-lg font-bold mb-2">Case Progress</h3>
-          <p className="text-primary-200 text-sm mb-6">Your main case is currently in the "Evidence Collection" phase.</p>
+          <p className="text-primary-200 text-sm mb-6">
+            {primaryCase ? `${primaryCase.title} is currently ${primaryCase.status}.` : 'No active case has been linked to your profile yet.'}
+          </p>
           <div className="w-full bg-primary-800 rounded-full h-2 mb-2">
-            <div className="bg-primary-400 h-2 rounded-full" style={{ width: '65%' }}></div>
+            <div className="bg-primary-400 h-2 rounded-full" style={{ width: `${progress}%` }}></div>
           </div>
-          <p className="text-xs font-bold text-right">65% Complete</p>
+          <p className="text-xs font-bold text-right">{progress}% Complete</p>
         </div>
-        <div className="card p-6">
+        <div onClick={() => navigate('/my-invoices')} className="card p-6 cursor-pointer hover:shadow-lg transition-all">
           <h3 className="text-lg font-bold text-neutral-900 mb-2">Recent Invoices</h3>
-          <p className="text-neutral-500 text-sm mb-6">You have 1 pending invoice for this month.</p>
-          <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded flex items-center justify-center text-primary-600 border border-neutral-200">
-                <FileText className="w-5 h-5" />
+          <p className="text-neutral-500 text-sm mb-6">
+            {invoices.length > 0 ? `Outstanding balance: PKR ${outstanding.toLocaleString()}` : 'No pending invoices linked to your profile.'}
+          </p>
+          <div className="space-y-3">
+            {invoices.length > 0 ? (
+              invoices.slice(0, 3).map((invoice: any) => (
+                <div key={invoice._id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded flex items-center justify-center text-primary-600 border border-neutral-200">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-neutral-900">{invoice.invoiceNumber}</p>
+                      <p className="text-xs text-neutral-500">Due: {new Date(invoice.dueDate).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold text-neutral-900">PKR {invoice.amount.toLocaleString()}</p>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-100 text-sm text-neutral-500">
+                Your invoices will appear here when your firm issues them.
               </div>
-              <div>
-                <p className="text-sm font-bold text-neutral-900">INV-2024-001</p>
-                <p className="text-xs text-neutral-500">Due: 30 Mar 2024</p>
-              </div>
-            </div>
-            <p className="text-sm font-bold text-neutral-900">PKR 15,000</p>
+            )}
           </div>
         </div>
       </div>
       <div className="card p-6">
         <h3 className="text-lg font-bold text-neutral-900 mb-6">Upcoming Milestones</h3>
         <div className="space-y-4">
-          {[
-            { title: 'Next Court Hearing', date: '25 Mar 2024', status: 'Scheduled' },
-            { title: 'Document Submission', date: '28 Mar 2024', status: 'Pending' },
-          ].map((m, i) => (
-            <div key={i} className="flex items-center justify-between p-4 border border-neutral-100 rounded-xl">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center">
-                  <Calendar className="w-5 h-5" />
+          {summary.upcomingHearings?.length > 0 ? (
+            summary.upcomingHearings.slice(0, 4).map((hearing: any) => (
+              <div key={hearing._id} className="flex items-center justify-between p-4 border border-neutral-100 rounded-xl">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-neutral-900">{hearing.purpose || 'Next Court Hearing'}</p>
+                    <p className="text-xs text-neutral-500">{new Date(hearing.date).toLocaleDateString()} - {hearing.court}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-neutral-900">{m.title}</p>
-                  <p className="text-xs text-neutral-500">{m.date}</p>
-                </div>
+                <span className="badge bg-primary-100 text-primary-700">{hearing.status}</span>
               </div>
-              <span className="badge bg-primary-100 text-primary-700">{m.status}</span>
+            ))
+          ) : activeCases.length > 0 ? (
+            activeCases.slice(0, 4).map((caseItem: any) => (
+              <div key={caseItem._id} className="flex items-center justify-between p-4 border border-neutral-100 rounded-xl">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center">
+                    <Briefcase className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-neutral-900">{caseItem.title}</p>
+                    <p className="text-xs text-neutral-500">{caseItem.caseNumber}</p>
+                  </div>
+                </div>
+                <span className="badge bg-primary-100 text-primary-700">{caseItem.status}</span>
+              </div>
+            ))
+          ) : (
+            <div className="p-4 border border-neutral-100 rounded-xl text-sm text-neutral-500">
+              Your case milestones will appear here after a firm links a case to your profile.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
@@ -519,7 +604,7 @@ function PriorityTasksList({ tasks = [] }: any) {
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Tomorrow';
     if (diffDays > 1 && diffDays < 7) return `${diffDays}d`;
-    return taskDate.toLocaleDateString('en-PK', { day: 'short', month: 'short' });
+    return taskDate.toLocaleDateString('en-PK', { day: '2-digit', month: 'short' });
   };
 
   return (

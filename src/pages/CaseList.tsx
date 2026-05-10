@@ -75,8 +75,11 @@ export default function CaseList() {
         status: caseItem.status,
         clientName: caseItem.clientName,
         clientId: caseItem.clientId,
+        clientUid: caseItem.clientUid,
+        clientEmail: caseItem.clientEmail,
         assignedLawyerUid: caseItem.assignedLawyerUid,
         assignedLawyerName: caseItem.assignedLawyerName,
+        createdByUid: caseItem.createdByUid,
         nextHearingDate: caseItem.nextHearingDate,
         lastActivityDate: caseItem.lastActivityDate,
         tags: caseItem.tags || [],
@@ -364,4 +367,3 @@ export default function CaseList() {
     </div>
   );
 }
-
