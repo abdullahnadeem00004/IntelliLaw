@@ -34,6 +34,7 @@ import Messaging from './pages/Messaging';
 import FirmProfile from './pages/FirmProfile';
 import KnowledgeBase from './pages/KnowledgeBase';
 import AdminUsers from './pages/AdminUsers';
+import DocumentDrafter from './pages/DocumentDrafter';
 import { FirebaseProvider } from './components/FirebaseProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 import { UserRole } from './types';
@@ -86,6 +87,7 @@ export default function App() {
               {/* Available to All */}
               <Route path="calendar" element={<Calendar />} />
               <Route path="documents" element={<Documents />} />
+              <Route path="document-drafter" element={<PrivateRoute allowedUserTypes={['FIRM', 'LAWYER']}><DocumentDrafter /></PrivateRoute>} />
               <Route path="tasks" element={<Tasks />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="knowledge-base" element={<KnowledgeBase />} />

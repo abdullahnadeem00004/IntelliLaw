@@ -17,7 +17,8 @@ import {
   BarChart3,
   MessageSquare,
   Building2,
-  Book
+  Book,
+  Zap
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -54,6 +55,7 @@ const allNavItems: NavItem[] = [
   { icon: BarChart3, label: 'Reports', path: '/reports', allowedUserTypes: ['FIRM'] },
   { icon: Users, label: 'User Management', path: '/admin/users', allowedUserTypes: ['FIRM'] },
   { icon: FileText, label: 'Documents', path: '/documents' },
+  { icon: Zap, label: 'Document Drafter', path: '/document-drafter', allowedUserTypes: ['FIRM', 'LAWYER'] },
   { icon: CheckSquare, label: 'Tasks', path: '/tasks' },
   { icon: Users, label: 'Clients', path: '/clients', allowedUserTypes: ['FIRM', 'LAWYER'] },
   { icon: CreditCard, label: 'Billing', path: '/billing', allowedUserTypes: ['FIRM', 'LAWYER'] },

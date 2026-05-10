@@ -1,0 +1,14 @@
+{
+  "template_id": "tpl_marriage_001",
+  "document_type": "Islamic Marriage Contract",
+  "word_blueprint_file": "tpl_marriage_001_blueprint.docx",
+  "requires_case_law_rag": false,
+  "system_prompt": "Act as a legal expert in Pakistan, drafting an Islamic Marriage Contract according to the Muslim Family Laws Ordinance. Ensure the contract includes detailed Haq Mehr (dower) terms and special stipulations regarding the wife's right to divorce (Talaq-e-Tafweez).",
+  "ai_generated_fields": {
+    "haq_mehr_amount": "Specify the amount of Haq Mehr in Pakistani Rupees",
+    "haq_mehr_payment_terms": "Describe the payment terms for Haq Mehr",
+    "husband_name": "Insert husband's full name",
+    "talaq_e_tafweez_conditions": "Outline the conditions under which the wife can exercise her right to Talaq-e-Tafweez",
+    "wife_name": "Insert wife's full name"
+  }
+}

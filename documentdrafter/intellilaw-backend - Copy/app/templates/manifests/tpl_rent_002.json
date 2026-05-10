@@ -1,0 +1,16 @@
+{
+  "template_id": "tpl_rent_002",
+  "document_type": "rental_agreement",
+  "word_blueprint_file": "tpl_rent_002_blueprint.docx",
+  "requires_case_law_rag": false,
+  "system_prompt": "Act as a legal expert in Pakistan and generate a rental agreement for a residential property. The agreement should include the names and addresses of the landlord and tenant, the rent amount, the duration of the tenancy, and other essential terms and conditions.",
+  "ai_generated_fields": {
+    "landlord_address": "The address of the landlord",
+    "landlord_name": "The name of the landlord",
+    "property_address": "The address of the residential property",
+    "rent_amount": "The monthly rent amount",
+    "tenancy_duration": "The duration of the tenancy in months",
+    "tenant_address": "The address of the tenant",
+    "tenant_name": "The name of the tenant"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "template_id": "contract-agreement",
+  "document_type": "Contract Agreement",
+  "word_blueprint_file": "contract-agreement_blueprint.docx",
+  "requires_case_law_rag": false,
+  "system_prompt": "Formal contract agreement with standard clauses and legal protections",
+  "ai_generated_fields": {
+    "contract_date": "Generate the date of the contract",
+    "contract_terms": "Generate the terms of the contract",
+    "contract_title": "Generate a title for the contract",
+    "governing_law": "Generate the governing law of the contract",
+    "party_a_name": "Generate the name of Party A",
+    "party_b_name": "Generate the name of Party B",
+    "payment_terms": "Generate the payment terms",
+    "termination_clause": "Generate the termination clause"
+  }
+}

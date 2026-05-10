@@ -1,0 +1,10 @@
+{
+  "template_id": "tpl_bail_001",
+  "document_type": "Post-Arrest Bail Petition",
+  "word_blueprint_file": "standard_bail_blueprint.docx",
+  "requires_case_law_rag": true,
+  "system_prompt": "You are an expert Pakistani criminal defense lawyer. Write the requested paragraphs for a Post-Arrest Bail Petition under Section 497 Cr.P.C. Be persuasive and professional.",
+  "ai_generated_fields": {
+    "legal_grounds_paragraph": "The formal legal arguments for the bail petition based on the retrieved case law and FIR details. Do not include introductory phrases."
+  }
+}
